@@ -1,0 +1,94 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Data Source Motion</title>
+  <style>
+    body { margin: 0; font-family: Segoe UI, Arial, sans-serif; background: #10231b; color: #f7fee7; }
+    main { padding: 14px; display: grid; gap: 10px; }
+    button { border: 1px solid #86efac; background: #15803d; color: white; padding: 8px 10px; border-radius: 6px; cursor: pointer; }
+    pre { min-height: 220px; white-space: pre-wrap; background: #052e16; border: 1px solid #22c55e; border-radius: 6px; padding: 10px; font-size: 12px; }
+  </style>
+</head>
+<body>
+  <main>
+    <strong>Data Source Motion</strong>
+    <button id="register">Register Source</button>
+    <button id="read">Read Data</button>
+    <button id="bake">Bake Data Motion</button>
+    <pre id="log">Loading...</pre>
+  </main>
+
+  <script src="/js/yoAnimeBridge.js"></script>
+  <script>
+    const sourceId = "sample.phase103.metrics";
+    const providerId = "sample.phase103.data-rise";
+    let value = 2;
+    const log = value => {
+      document.getElementById("log").textContent = typeof value === "string" ? value : JSON.stringify(value, null, 2);
+    };
+    const run = async action => {
+      try { await action(); } catch (error) { console.error(error); log(error.message || String(error)); }
+    };
+
+    async function registerAll() {
+      await yoanime.data.registerSource({
+        id: sourceId,
+        label: "Phase 103 Metrics",
+        refreshIntervalSeconds: 5,
+        refresh: async () => {
+          value += 1;
+          return { rows: [{ label: "score", value }] };
+        }
+      }, { replace: true, ownerExtensionId: "sample.data-source-motion" });
+      try { yoanime.motionProviders.unregister(providerId); } catch (_) {}
+      const registration = await yoanime.motionProviders.register({
+        id: providerId,
+        label: "Data Driven Rise",
+        kind: "data",
+        generate: async context => {
+          const data = await context.data.read(sourceId, { cacheTtlSeconds: 5 });
+          const selected = context.selection?.primary || context.selection?.shape || context.selection;
+          const runtimeNodeId = selected?.runtimeNodeId || selected?.id;
+          if (!runtimeNodeId) throw new Error("Select a PowerPoint shape first.");
+          const bounds = selected.bounds || selected.slideBounds || {};
+          const startY = Number(bounds.top ?? bounds.y ?? selected.y ?? 0);
+          const amount = Number(data.rows?.[0]?.value ?? 1) * 12;
+          return {
+            contractVersion: "generated-motion.v1",
+            label: "Data Driven Rise",
+            durationSeconds: 1,
+            seed: `data-${amount}`,
+            clear: ["PositionY"],
+            layers: [{
+              runtimeNodeId,
+              properties: {
+                PositionY: {
+                  durationSeconds: 1,
+                  keyframes: [
+                    { normalizedTime: 0, value: { number: startY } },
+                    { normalizedTime: 0.5, value: { number: startY - amount } },
+                    { normalizedTime: 1, value: { number: startY } }
+                  ]
+                }
+              }
+            }],
+            metadata: { sourceId, amount }
+          };
+        }
+      }, { ownerExtensionId: "sample.data-source-motion" });
+      log({ sources: yoanime.data.listSources(), providerRegistration: registration });
+    }
+
+    async function boot() {
+      await yoanime.runtime.ready();
+      document.getElementById("register").onclick = () => run(registerAll);
+      document.getElementById("read").onclick = () => run(async () => log(await yoanime.data.refresh(sourceId)));
+      document.getElementById("bake").onclick = () => run(async () => log(await yoanime.motionProviders.bake(providerId, { play: true })));
+      log("Ready. Select a shape, register source, then bake.");
+    }
+    boot().catch(error => log(error.message || String(error)));
+  </script>
+</body>
+</html>

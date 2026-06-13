@@ -1,0 +1,63 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>My yoAnime Extension</title>
+  <style>
+    body { margin: 0; font-family: Segoe UI, Arial, sans-serif; background: #101114; color: #f3f5f7; }
+    main { padding: 14px; display: grid; gap: 10px; }
+    button { border: 1px solid #3b82f6; background: #1d4ed8; color: white; padding: 8px 10px; border-radius: 6px; cursor: pointer; }
+    pre { min-height: 120px; white-space: pre-wrap; background: #181a20; border: 1px solid #2b2f3a; border-radius: 6px; padding: 10px; }
+  </style>
+</head>
+<body>
+  <main>
+    <strong>My yoAnime Extension</strong>
+    <button id="show">Show Overlay</button>
+    <button id="refresh">Refresh Scene</button>
+    <pre id="log">Loading...</pre>
+  </main>
+
+  <script src="/js/yoAnimeBridge.js"></script>
+  <script>
+    const log = value => {
+      document.getElementById("log").textContent =
+        typeof value === "string" ? value : JSON.stringify(value, null, 2);
+    };
+
+    async function run(label, action) {
+      try {
+        log(label + "...");
+        return await action();
+      } catch (error) {
+        console.error(error);
+        log(error.message || String(error));
+      }
+    }
+
+    async function boot() {
+      await yoanime.runtime.ready();
+
+      yoanime.taskpane.onMessage(event => {
+        log(event.message);
+      });
+
+      document.getElementById("show").onclick = () => run("Showing overlay", async () => {
+        await yoanime.overlay.show();
+        log("Overlay shown");
+      });
+
+      document.getElementById("refresh").onclick = () => run("Refreshing scene", async () => {
+        await yoanime.overlay.show();
+        await yoanime.overlay.postMessage({ type: "my-extension.refresh-scene" });
+      });
+
+      log("Ready");
+    }
+
+    boot().catch(error => log(error.message || String(error)));
+  </script>
+</body>
+</html>
+

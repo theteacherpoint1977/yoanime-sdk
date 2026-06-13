@@ -1,0 +1,38 @@
+{
+  "manifestVersion": 2,
+  "id": "my-extension",
+  "name": "My Extension",
+  "version": "0.1.0",
+  "author": "Your Name",
+  "description": "A yoAnime 1.0.2 taskpane plus overlay extension.",
+  "surface": "overlay-taskpane",
+  "entry": "overlay.html",
+  "taskPaneEntry": "taskpane.html",
+  "sdkVersionMin": "0.3.0",
+  "permissions": [
+    "selection.read",
+    "scene.read",
+    "scene.write",
+    "geometry.read",
+    "timeline.read",
+    "timeline.write",
+    "timeline.playback",
+    "interaction.write",
+    "surface.messaging"
+  ],
+  "capabilities": [
+    "overlay.surface",
+    "taskpane.surface",
+    "surface.messaging"
+  ],
+  "gallery": {
+    "category": "starter",
+    "tags": ["starter", "taskpane", "overlay"],
+    "license": "MIT",
+    "channel": "stable",
+    "changelog": "Initial yoAnime 1.0.2 package."
+  },
+  "update": {
+    "channel": "stable"
+  }
+}

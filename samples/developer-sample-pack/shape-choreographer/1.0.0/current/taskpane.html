@@ -1,0 +1,849 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Shape Choreographer</title>
+  <style>
+    /* ── Reset & tokens ─────────────────────────────────────────── */
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --bg:        #0d1117;
+      --surface:   #161b22;
+      --surface2:  #21262d;
+      --border:    #30363d;
+      --border2:   #444c56;
+      --text:      #e6edf3;
+      --muted:     #8b949e;
+      --accent:    #388bfd;
+      --accent-bg: rgba(56,139,253,0.15);
+      --success:   #3fb950;
+      --warn:      #d29922;
+      --danger:    #f85149;
+      --radius:    6px;
+      --track-h:   38px;
+    }
+
+    body {
+      background: var(--bg);
+      color: var(--text);
+      font-family: "Segoe UI", system-ui, sans-serif;
+      font-size: 13px;
+      height: 100vh;
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+    }
+
+    /* ── Header ─────────────────────────────────────────────────── */
+    .header {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      padding: 10px 12px 8px;
+      border-bottom: 1px solid var(--border);
+      flex-shrink: 0;
+    }
+    .header-logo { font-size: 18px; line-height: 1; }
+    .header-title { font-weight: 600; font-size: 13px; color: var(--text); }
+    .header-version { font-size: 10px; color: var(--muted); margin-left: auto; }
+
+    /* ── Status bar ──────────────────────────────────────────────── */
+    .status-bar {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      padding: 5px 12px;
+      background: var(--surface);
+      border-bottom: 1px solid var(--border);
+      font-size: 11px;
+      color: var(--muted);
+      flex-shrink: 0;
+      min-height: 26px;
+    }
+    .status-dot {
+      width: 6px; height: 6px;
+      border-radius: 50%;
+      background: var(--muted);
+      flex-shrink: 0;
+    }
+    .status-dot.ok    { background: var(--success); }
+    .status-dot.warn  { background: var(--warn); }
+    .status-dot.error { background: var(--danger); }
+
+    /* ── Global settings row ─────────────────────────────────────── */
+    .settings-row {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      padding: 7px 12px;
+      border-bottom: 1px solid var(--border);
+      flex-shrink: 0;
+      flex-wrap: wrap;
+    }
+    .settings-row label {
+      display: flex;
+      align-items: center;
+      gap: 5px;
+      color: var(--muted);
+      font-size: 11px;
+    }
+    .settings-row input[type="number"],
+    .settings-row select {
+      background: var(--surface2);
+      border: 1px solid var(--border);
+      color: var(--text);
+      border-radius: var(--radius);
+      padding: 3px 6px;
+      font-size: 12px;
+      width: 68px;
+    }
+    .settings-row select { width: auto; }
+    .settings-row input:focus,
+    .settings-row select:focus {
+      outline: none;
+      border-color: var(--accent);
+    }
+
+    /* ── Shape track list ────────────────────────────────────────── */
+    .track-list-wrap {
+      flex: 1;
+      overflow-y: auto;
+      padding: 6px 0;
+    }
+    .empty-state {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      height: 100%;
+      gap: 8px;
+      color: var(--muted);
+      text-align: center;
+      padding: 24px;
+    }
+    .empty-icon { font-size: 28px; opacity: 0.5; }
+    .empty-hint { font-size: 11px; line-height: 1.5; }
+
+    .track-item {
+      display: grid;
+      grid-template-columns: 1fr auto;
+      gap: 4px;
+      padding: 5px 12px;
+      border-bottom: 1px solid var(--border);
+      transition: background 100ms;
+    }
+    .track-item:hover { background: var(--surface); }
+    .track-item.selected-track { background: var(--accent-bg); }
+
+    .track-name {
+      font-size: 12px;
+      font-weight: 500;
+      color: var(--text);
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+    .track-id {
+      font-size: 10px;
+      color: var(--muted);
+      font-family: monospace;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+    .track-controls {
+      display: flex;
+      align-items: center;
+      gap: 5px;
+      flex-shrink: 0;
+    }
+
+    /* Preset pill */
+    .preset-pill {
+      display: inline-flex;
+      align-items: center;
+      gap: 4px;
+      padding: 2px 7px;
+      border-radius: 99px;
+      border: 1px solid transparent;
+      font-size: 11px;
+      cursor: pointer;
+      transition: filter 120ms, transform 80ms;
+      color: #fff;
+      background: #30363d;
+    }
+    .preset-pill:hover { filter: brightness(1.2); }
+    .preset-pill:active { transform: scale(0.97); }
+
+    /* Offset & duration inline inputs */
+    .track-timing {
+      display: flex;
+      gap: 4px;
+      align-items: center;
+      font-size: 11px;
+      color: var(--muted);
+    }
+    .track-timing input[type="number"] {
+      width: 46px;
+      background: var(--surface2);
+      border: 1px solid var(--border);
+      color: var(--text);
+      border-radius: var(--radius);
+      padding: 2px 4px;
+      font-size: 11px;
+      text-align: center;
+    }
+    .track-timing input:focus {
+      outline: none;
+      border-color: var(--accent);
+    }
+
+    .track-remove {
+      background: none;
+      border: none;
+      color: var(--muted);
+      cursor: pointer;
+      padding: 2px 4px;
+      border-radius: 4px;
+      font-size: 14px;
+      line-height: 1;
+      transition: color 100ms, background 100ms;
+    }
+    .track-remove:hover { color: var(--danger); background: rgba(248,81,73,0.12); }
+
+    /* ── Preset picker modal ─────────────────────────────────────── */
+    .preset-modal-backdrop {
+      position: fixed;
+      inset: 0;
+      background: rgba(0,0,0,0.55);
+      z-index: 100;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+    .preset-modal-backdrop.hidden { display: none; }
+    .preset-modal {
+      background: var(--surface);
+      border: 1px solid var(--border2);
+      border-radius: 8px;
+      padding: 12px;
+      width: 220px;
+      display: grid;
+      gap: 6px;
+    }
+    .preset-modal-title {
+      font-size: 12px;
+      font-weight: 600;
+      color: var(--muted);
+      padding-bottom: 4px;
+      border-bottom: 1px solid var(--border);
+    }
+    .preset-option {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      padding: 6px 8px;
+      border-radius: var(--radius);
+      cursor: pointer;
+      transition: background 100ms;
+    }
+    .preset-option:hover { background: var(--surface2); }
+    .preset-icon {
+      width: 22px;
+      height: 22px;
+      border-radius: 50%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 12px;
+      flex-shrink: 0;
+    }
+    .preset-option-label { font-size: 12px; }
+    .preset-modal-cancel {
+      background: none;
+      border: 1px solid var(--border);
+      color: var(--muted);
+      border-radius: var(--radius);
+      padding: 5px;
+      cursor: pointer;
+      font-size: 12px;
+      margin-top: 2px;
+      transition: border-color 100ms, color 100ms;
+    }
+    .preset-modal-cancel:hover { border-color: var(--border2); color: var(--text); }
+
+    /* ── Action bar ──────────────────────────────────────────────── */
+    .action-bar {
+      display: grid;
+      grid-template-columns: 1fr 1fr 1fr;
+      gap: 6px;
+      padding: 8px 12px;
+      border-top: 1px solid var(--border);
+      flex-shrink: 0;
+    }
+    .btn {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 5px;
+      padding: 7px 6px;
+      border-radius: var(--radius);
+      border: 1px solid transparent;
+      font-size: 12px;
+      font-weight: 500;
+      cursor: pointer;
+      transition: filter 120ms, transform 80ms, box-shadow 120ms;
+      color: #fff;
+    }
+    .btn:active { transform: translateY(1px) scale(0.98); }
+    .btn:disabled { opacity: 0.45; cursor: not-allowed; transform: none; }
+    .btn-overlay  { background: #21262d; border-color: var(--border2); color: var(--text); }
+    .btn-overlay:hover:not(:disabled) { background: #2d333b; }
+    .btn-stagger  { background: #1f6feb; border-color: transparent; }
+    .btn-stagger:hover:not(:disabled) { filter: brightness(1.12); }
+    .btn-bake     { background: #238636; border-color: transparent; }
+    .btn-bake:hover:not(:disabled)    { filter: brightness(1.12); }
+    .btn.busy     { filter: brightness(0.85); }
+    .btn.flash    { background: #388bfd; }
+
+    /* ── Log ──────────────────────────────────────────────────────── */
+    .log-wrap {
+      padding: 4px 12px 8px;
+      flex-shrink: 0;
+      max-height: 68px;
+      overflow-y: auto;
+    }
+    .log-line {
+      font-family: monospace;
+      font-size: 10.5px;
+      color: var(--muted);
+      line-height: 1.5;
+      white-space: pre-wrap;
+      word-break: break-all;
+    }
+    .log-line.ok    { color: var(--success); }
+    .log-line.error { color: var(--danger); }
+    .log-line.warn  { color: var(--warn); }
+  </style>
+</head>
+<body>
+
+  <!-- Header -->
+  <div class="header">
+    <span class="header-logo">🎬</span>
+    <span class="header-title">Shape Choreographer</span>
+    <span class="header-version" id="sdkVersion">SDK —</span>
+  </div>
+
+  <!-- Status bar -->
+  <div class="status-bar">
+    <div class="status-dot" id="statusDot"></div>
+    <span id="statusText">Initializing…</span>
+  </div>
+
+  <!-- Global settings -->
+  <div class="settings-row">
+    <label>
+      Stagger
+      <input type="number" id="staggerInput" min="0" max="2" step="0.05" value="0.18">
+      s
+    </label>
+    <label>
+      Duration
+      <input type="number" id="durationInput" min="0.1" max="4" step="0.05" value="0.70">
+      s
+    </label>
+    <label>
+      Default preset
+      <select id="defaultPreset"></select>
+    </label>
+  </div>
+
+  <!-- Track list -->
+  <div class="track-list-wrap" id="trackListWrap">
+    <div class="empty-state" id="emptyState">
+      <div class="empty-icon">🎭</div>
+      <div>Select shapes in PowerPoint<br>and click <strong>Add Selected</strong>.</div>
+      <div class="empty-hint">Each shape gets its own entrance preset and timing offset.</div>
+    </div>
+    <div id="trackList"></div>
+  </div>
+
+  <!-- Action bar -->
+  <div class="action-bar">
+    <button class="btn btn-overlay" id="btnOverlay" title="Open the timing overlay">⊞ Overlay</button>
+    <button class="btn btn-stagger" id="btnAddSelected" disabled title="Add selected PowerPoint shapes to the sequence">＋ Add</button>
+    <button class="btn btn-bake"    id="btnBake"        disabled title="Bake all tracks and play">▶ Bake</button>
+  </div>
+
+  <!-- Log -->
+  <div class="log-wrap" id="logWrap">
+    <div class="log-line" id="logLine">Loading bridge…</div>
+  </div>
+
+  <!-- Preset picker modal -->
+  <div class="preset-modal-backdrop hidden" id="presetModal">
+    <div class="preset-modal">
+      <div class="preset-modal-title">Choose entrance preset</div>
+      <div id="presetOptionList"></div>
+      <button class="preset-modal-cancel" id="presetModalCancel">Cancel</button>
+    </div>
+  </div>
+
+  <script src="/js/yoAnimeBridge.js"></script>
+  <script src="./assets/choreographer-shared.js"></script>
+  <script>
+  (() => {
+    "use strict";
+
+    const { PRESETS, CHANNEL_ID, MSG,
+            DEFAULT_STAGGER_SECONDS, DEFAULT_DURATION_SECONDS } = window.CHOREOGRAPHER;
+
+    // ── DOM refs ──────────────────────────────────────────────────────────────
+    const $statusDot      = document.getElementById("statusDot");
+    const $statusText     = document.getElementById("statusText");
+    const $sdkVersion     = document.getElementById("sdkVersion");
+    const $trackList      = document.getElementById("trackList");
+    const $emptyState     = document.getElementById("emptyState");
+    const $logLine        = document.getElementById("logLine");
+    const $staggerInput   = document.getElementById("staggerInput");
+    const $durationInput  = document.getElementById("durationInput");
+    const $defaultPreset  = document.getElementById("defaultPreset");
+    const $btnAddSelected = document.getElementById("btnAddSelected");
+    const $btnBake        = document.getElementById("btnBake");
+    const $btnOverlay     = document.getElementById("btnOverlay");
+    const $presetModal    = document.getElementById("presetModal");
+    const $presetOptList  = document.getElementById("presetOptionList");
+    const $presetCancel   = document.getElementById("presetModalCancel");
+
+    // ── State ──────────────────────────────────────────────────────────────────
+    /** @type {{ runtimeNodeId: string, name: string, presetId: string, offsetSeconds: number, durationSeconds: number }[]} */
+    let tracks = [];
+    let channel = null;
+    let pendingPresetCallback = null;  // for modal
+    let slideCtx = null;               // cached slide.getContext()
+
+    // ── Logging ────────────────────────────────────────────────────────────────
+    function log(msg, kind = "") {
+      $logLine.textContent = msg;
+      $logLine.className = "log-line" + (kind ? " " + kind : "");
+    }
+
+    function setStatus(text, state = "") {
+      $statusText.textContent = text;
+      $statusDot.className = "status-dot" + (state ? " " + state : "");
+    }
+
+    // ── Preset select population ───────────────────────────────────────────────
+    function populateDefaultPresetSelect() {
+      $defaultPreset.innerHTML = "";
+      for (const [id, p] of Object.entries(PRESETS)) {
+        const opt = document.createElement("option");
+        opt.value = id;
+        opt.textContent = p.icon + " " + p.label;
+        $defaultPreset.appendChild(opt);
+      }
+    }
+
+    function populatePresetModal(callback) {
+      $presetOptList.innerHTML = "";
+      for (const [id, p] of Object.entries(PRESETS)) {
+        const el = document.createElement("div");
+        el.className = "preset-option";
+        el.innerHTML = `
+          <div class="preset-icon" style="background:${p.color}20;color:${p.color}">${p.icon}</div>
+          <span class="preset-option-label">${p.label}</span>
+        `;
+        el.addEventListener("click", () => {
+          closePresetModal();
+          callback(id);
+        });
+        $presetOptList.appendChild(el);
+      }
+      pendingPresetCallback = callback;
+      $presetModal.classList.remove("hidden");
+    }
+
+    function closePresetModal() {
+      $presetModal.classList.add("hidden");
+      pendingPresetCallback = null;
+    }
+
+    $presetCancel.addEventListener("click", closePresetModal);
+    $presetModal.addEventListener("click", e => {
+      if (e.target === $presetModal) closePresetModal();
+    });
+
+    // ── Track list rendering ───────────────────────────────────────────────────
+    function renderTracks() {
+      const hasTracks = tracks.length > 0;
+      $emptyState.style.display = hasTracks ? "none" : "flex";
+      $trackList.innerHTML = "";
+      $btnBake.disabled = !hasTracks;
+
+      tracks.forEach((track, i) => {
+        const preset = PRESETS[track.presetId] || PRESETS["fade-in"];
+        const item = document.createElement("div");
+        item.className = "track-item";
+        item.dataset.nodeId = track.runtimeNodeId;
+
+        item.innerHTML = `
+          <div>
+            <div class="track-name" title="${track.name}">${track.name}</div>
+            <div class="track-id">${track.runtimeNodeId.slice(0, 22)}…</div>
+          </div>
+          <div class="track-controls">
+            <div class="track-timing">
+              +<input class="offset-input" type="number" min="0" max="10" step="0.05"
+                      value="${track.offsetSeconds.toFixed(2)}" title="Start offset (s)">s
+              &nbsp;
+              <input class="dur-input" type="number" min="0.1" max="4" step="0.05"
+                      value="${track.durationSeconds.toFixed(2)}" title="Duration (s)">s
+            </div>
+            <button class="preset-pill" data-idx="${i}"
+                    style="background:${preset.color}22;border-color:${preset.color}60;color:${preset.color}">
+              ${preset.icon} ${preset.label}
+            </button>
+            <button class="track-remove" data-idx="${i}" title="Remove from sequence">×</button>
+          </div>
+        `;
+
+        // Wire offset input
+        item.querySelector(".offset-input").addEventListener("change", e => {
+          const val = Math.max(0, parseFloat(e.target.value) || 0);
+          tracks[i].offsetSeconds = val;
+          broadcastSceneUpdate();
+        });
+
+        // Wire duration input
+        item.querySelector(".dur-input").addEventListener("change", e => {
+          const val = Math.max(0.1, parseFloat(e.target.value) || DEFAULT_DURATION_SECONDS);
+          tracks[i].durationSeconds = val;
+          broadcastSceneUpdate();
+        });
+
+        // Wire preset pill
+        item.querySelector(".preset-pill").addEventListener("click", () => {
+          populatePresetModal(newPresetId => {
+            tracks[i].presetId = newPresetId;
+            renderTracks();
+            broadcastSceneUpdate();
+          });
+        });
+
+        // Wire remove
+        item.querySelector(".track-remove").addEventListener("click", () => {
+          const removed = tracks.splice(i, 1)[0];
+          renderTracks();
+          broadcastSceneUpdate();
+          broadcastMessage(MSG.TRACK_REMOVED, { runtimeNodeId: removed.runtimeNodeId });
+          log(`Removed "${removed.name}" from sequence.`);
+        });
+
+        $trackList.appendChild(item);
+      });
+    }
+
+    // ── Channel ────────────────────────────────────────────────────────────────
+    async function broadcastMessage(type, payload) {
+      if (!channel) return;
+      try {
+        await channel.publish(type, payload, { target: "peer" });
+      } catch (_) { /* overlay may not be open yet */ }
+    }
+
+    function broadcastSceneUpdate() {
+      broadcastMessage(MSG.SCENE_UPDATE, {
+        tracks: tracks.map(t => ({
+          runtimeNodeId: t.runtimeNodeId,
+          name: t.name,
+          presetId: t.presetId,
+          offsetSeconds: t.offsetSeconds,
+          durationSeconds: t.durationSeconds,
+          color: (PRESETS[t.presetId] || PRESETS["fade-in"]).color,
+          icon: (PRESETS[t.presetId] || PRESETS["fade-in"]).icon
+        }))
+      });
+      broadcastMessage(MSG.SETTINGS_UPDATE, {
+        stagger: parseFloat($staggerInput.value) || DEFAULT_STAGGER_SECONDS,
+        totalDuration: window.CHOREOGRAPHER.TIMELINE_WIDTH_SECONDS
+      });
+    }
+
+    // ── Add selected shapes ────────────────────────────────────────────────────
+    async function addSelectedShapes() {
+      $btnAddSelected.disabled = true;
+      log("Reading selection…");
+      try {
+        const sel = await yoanime.selection.get();
+        if (!sel || !sel.runtimeNodeId) {
+          log("Nothing selected in PowerPoint.", "warn");
+          return;
+        }
+
+        // Fetch scene for bounds info
+        const scene = await yoanime.scene.get({ includeGeometry: true, includeTags: true });
+        const allShapes = scene.shapes || [];
+
+        // sel may be a single shape or an array (multi-select)
+        const selArray = Array.isArray(sel) ? sel : [sel];
+
+        let added = 0;
+        const stagger = parseFloat($staggerInput.value) || DEFAULT_STAGGER_SECONDS;
+        const defaultDur = parseFloat($durationInput.value) || DEFAULT_DURATION_SECONDS;
+        const defaultPreset = $defaultPreset.value || "fly-in-left";
+
+        for (const shape of selArray) {
+          if (!shape || !shape.runtimeNodeId) continue;
+          // Skip duplicates
+          if (tracks.some(t => t.runtimeNodeId === shape.runtimeNodeId)) {
+            log(`"${shape.name}" is already in the sequence.`, "warn");
+            continue;
+          }
+
+          const offsetSeconds = tracks.length * stagger;
+          tracks.push({
+            runtimeNodeId: shape.runtimeNodeId,
+            name: shape.name || shape.runtimeNodeId,
+            presetId: defaultPreset,
+            offsetSeconds,
+            durationSeconds: defaultDur
+          });
+          added++;
+        }
+
+        if (added > 0) {
+          renderTracks();
+          broadcastSceneUpdate();
+          log(`Added ${added} shape(s). Total: ${tracks.length}.`, "ok");
+        } else {
+          log("No new shapes added (already in sequence?).", "warn");
+        }
+      } catch (err) {
+        log("Error adding shapes: " + (err.message || err), "error");
+      } finally {
+        $btnAddSelected.disabled = false;
+      }
+    }
+
+    // ── Stagger auto-apply ─────────────────────────────────────────────────────
+    document.getElementById("btnStaggerApply") && document.getElementById("btnStaggerApply")
+      .addEventListener("click", applyStagger);
+
+    function applyStagger() {
+      const s = parseFloat($staggerInput.value) || DEFAULT_STAGGER_SECONDS;
+      tracks.forEach((t, i) => { t.offsetSeconds = +(i * s).toFixed(3); });
+      renderTracks();
+      broadcastSceneUpdate();
+      log(`Stagger applied: ${s}s between each shape.`, "ok");
+    }
+
+    $staggerInput.addEventListener("change", () => broadcastSceneUpdate());
+    $durationInput.addEventListener("change", () => broadcastSceneUpdate());
+
+    // ── Bake ───────────────────────────────────────────────────────────────────
+    async function bakeAll() {
+      if (tracks.length === 0) { log("No tracks to bake.", "warn"); return; }
+      $btnBake.disabled = true;
+      $btnBake.textContent = "⏳ Baking…";
+      $btnBake.classList.add("busy");
+      broadcastMessage(MSG.BAKE_START, {});
+      log("Fetching slide context…");
+
+      try {
+        // Refresh slide context for accurate dimensions
+        slideCtx = await yoanime.slide.getContext();
+        const slideW = slideCtx.slide.widthPoints;
+        const slideH = slideCtx.slide.heightPoints;
+
+        // Get scene for shape positions
+        const scene = await yoanime.scene.get({ includeGeometry: true });
+        const shapeMap = {};
+        (scene.shapes || []).forEach(s => { shapeMap[s.runtimeNodeId] = s; });
+
+        // Calculate total timeline duration needed
+        const maxEnd = tracks.reduce((acc, t) => {
+          return Math.max(acc, t.offsetSeconds + t.durationSeconds);
+        }, 0);
+        const timelineDuration = Math.max(maxEnd, 1);
+
+        // Build bake layers — each track is offset-aware by shifting keyframe times
+        const layers = [];
+
+        for (const track of tracks) {
+          const shape = shapeMap[track.runtimeNodeId];
+          if (!shape) {
+            log(`Warning: shape ${track.runtimeNodeId.slice(0,12)}… not found in scene.`, "warn");
+            continue;
+          }
+
+          const bounds = shape.bounds || shape.slideBounds || {};
+          const startX = Number(bounds.left ?? bounds.x ?? 0);
+          const startY = Number(bounds.top  ?? bounds.y ?? 0);
+
+          const preset = PRESETS[track.presetId] || PRESETS["fade-in"];
+          const rawLayer = preset.buildLayers(track.runtimeNodeId, {
+            startX, startY,
+            slideWidth: slideW,
+            slideHeight: slideH,
+            durationSeconds: track.durationSeconds
+          });
+
+          // Re-map normalized keyframe times into absolute timeline time,
+          // then re-normalize into the full timeline duration.
+          const offsetFraction = track.offsetSeconds / timelineDuration;
+          const durationFraction = track.durationSeconds / timelineDuration;
+
+          const remapped = { runtimeNodeId: rawLayer.runtimeNodeId, properties: {} };
+          for (const [propName, propTrack] of Object.entries(rawLayer.properties)) {
+            remapped.properties[propName] = {
+              durationSeconds: timelineDuration,
+              keyframes: propTrack.keyframes.map(kf => ({
+                normalizedTime: offsetFraction + kf.normalizedTime * durationFraction,
+                value: kf.value
+              }))
+            };
+          }
+          layers.push(remapped);
+        }
+
+        if (layers.length === 0) {
+          log("No valid layers to bake.", "warn");
+          return;
+        }
+
+        log(`Baking ${layers.length} layer(s)…`);
+        const result = await yoanime.timeline.bake({
+          label: "Shape Choreographer Sequence",
+          durationSeconds: timelineDuration,
+          layers
+        });
+
+        log(`Bake complete — ${layers.length} shapes, ${timelineDuration.toFixed(2)}s total.`, "ok");
+        broadcastMessage(MSG.BAKE_DONE, { durationSeconds: timelineDuration });
+
+        // Auto-play
+        await yoanime.timeline.playFrom(0);
+
+      } catch (err) {
+        log("Bake error: " + (err.message || err), "error");
+        console.error("[ChoreographerTaskpane] bake error:", err);
+      } finally {
+        $btnBake.disabled = tracks.length === 0;
+        $btnBake.textContent = "▶ Bake";
+        $btnBake.classList.remove("busy");
+      }
+    }
+
+    // ── Overlay ────────────────────────────────────────────────────────────────
+    $btnOverlay.addEventListener("click", async () => {
+      try {
+        await yoanime.overlay.show();
+        log("Overlay opened.");
+        broadcastSceneUpdate();
+      } catch (err) {
+        log("Could not open overlay: " + (err.message || err), "error");
+      }
+    });
+
+    // ── Wiring ─────────────────────────────────────────────────────────────────
+    $btnAddSelected.addEventListener("click", addSelectedShapes);
+    $btnBake.addEventListener("click", bakeAll);
+
+    // Listen for changes coming back from overlay
+    function handleOverlayMessage(event) {
+      const { type, ...data } = event.message || {};
+      if (!type) return;
+
+      switch (type) {
+        case MSG.OFFSET_CHANGED: {
+          const t = tracks.find(x => x.runtimeNodeId === data.runtimeNodeId);
+          if (t) { t.offsetSeconds = data.offsetSeconds; renderTracks(); }
+          break;
+        }
+        case MSG.DURATION_CHANGED: {
+          const t = tracks.find(x => x.runtimeNodeId === data.runtimeNodeId);
+          if (t) { t.durationSeconds = data.durationSeconds; renderTracks(); }
+          break;
+        }
+        case MSG.PRESET_CHANGED: {
+          const t = tracks.find(x => x.runtimeNodeId === data.runtimeNodeId);
+          if (t) { t.presetId = data.presetId; renderTracks(); }
+          break;
+        }
+        case MSG.TRACK_REMOVED: {
+          tracks = tracks.filter(x => x.runtimeNodeId !== data.runtimeNodeId);
+          renderTracks();
+          break;
+        }
+      }
+    }
+
+    // ── Boot ───────────────────────────────────────────────────────────────────
+    async function boot() {
+      populateDefaultPresetSelect();
+      renderTracks();
+
+      try {
+        setStatus("Waiting for SDK bridge…");
+        await yoanime.runtime.ready();
+
+        const caps = await yoanime.runtime.getCapabilities();
+        $sdkVersion.textContent = "SDK " + (caps.sdkVersion || "?");
+        setStatus("Connected · " + (caps.trust || "local"), "ok");
+        log("SDK ready. Permissions: " + (caps.permissions || []).join(", "), "ok");
+
+        // Verify required permissions
+        const required = ["selection.read", "scene.read", "timeline.write", "timeline.playback"];
+        const granted = caps.permissions || [];
+        const missing = required.filter(p => !granted.includes(p));
+        if (missing.length > 0) {
+          setStatus("Missing permissions: " + missing.join(", "), "warn");
+          log("⚠ Missing: " + missing.join(", "), "warn");
+        }
+
+        // Enable buttons
+        $btnAddSelected.disabled = false;
+
+        // Open runtime channel
+        channel = await yoanime.channels.open(CHANNEL_ID, {
+          label: "Shape Choreographer",
+          ownerExtensionId: "shape-choreographer"
+        });
+
+        channel.subscribe("*", event => {
+          handleOverlayMessage({ message: { type: event.event, ...event.payload } });
+        });
+
+        // Selection events
+        yoanime.selection.onChanged(async shape => {
+          if (shape) {
+            log(`Selected: "${shape.name}" (${shape.runtimeNodeId.slice(0,14)}…)`);
+          }
+        });
+        yoanime.selection.onCleared(() => log("Selection cleared."));
+
+        // Scene change events
+        yoanime.events.on("scene.changed", () => {
+          log("Scene changed — shape list may have updated.");
+        });
+
+        // Cache slide context in background
+        yoanime.slide.getContext().then(ctx => { slideCtx = ctx; }).catch(() => {});
+
+        log("Ready. Select shapes and click ＋ Add.", "ok");
+
+      } catch (err) {
+        setStatus("Error", "error");
+        log("Boot error: " + (err.message || err), "error");
+        console.error("[ChoreographerTaskpane] boot error:", err);
+      }
+    }
+
+    boot();
+  })();
+  </script>
+</body>
+</html>

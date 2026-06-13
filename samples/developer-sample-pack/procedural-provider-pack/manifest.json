@@ -1,0 +1,27 @@
+{
+  "manifestVersion": 2,
+  "id": "sample.procedural-provider-pack",
+  "name": "Sample Procedural Provider Pack",
+  "version": "0.1.0",
+  "author": "yoAnime",
+  "description": "Demonstrates provider packs, input schema, Scene Query DSL, and Generated Motion IR.",
+  "surface": "taskpane",
+  "taskPaneEntry": "taskpane.html",
+  "sdkVersionMin": "0.3.0",
+  "permissions": [
+    "selection.read",
+    "scene.read",
+    "timeline.write",
+    "timeline.playback"
+  ],
+  "capabilities": [
+    "taskpane.surface"
+  ],
+  "gallery": {
+    "category": "developer-sample",
+    "tags": ["provider-pack", "generated-motion-ir", "scene-query"],
+    "license": "MIT",
+    "channel": "stable",
+    "changelog": "Phase 103 developer sample."
+  }
+}

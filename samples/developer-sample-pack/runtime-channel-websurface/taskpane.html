@@ -1,0 +1,114 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Runtime Channel Sample</title>
+  <style>
+    body { margin: 0; font-family: Segoe UI, Arial, sans-serif; background: #172033; color: #f8fafc; }
+    main { padding: 14px; display: grid; gap: 10px; }
+    .status { display: grid; grid-template-columns: repeat(3, 1fr); gap: 6px; }
+    .pill { border: 1px solid #475569; background: #0f172a; border-radius: 6px; padding: 7px; font-size: 11px; }
+    .pill strong { display: block; font-size: 15px; color: #a7f3d0; }
+    button { border: 1px solid #a78bfa; background: #6d28d9; color: white; padding: 8px 10px; border-radius: 6px; cursor: pointer; transition: transform 120ms ease, filter 120ms ease, background 120ms ease; }
+    button:focus, button.latched { outline: none; box-shadow: 0 0 0 3px rgba(167, 139, 250, 0.42); }
+    button:active, button.busy { transform: translateY(1px) scale(0.99); filter: brightness(1.2); }
+    button.flash { background: #059669; border-color: #34d399; }
+    pre { min-height: 220px; white-space: pre-wrap; background: #0f172a; border: 1px solid #475569; border-radius: 6px; padding: 10px; font-size: 12px; }
+  </style>
+</head>
+<body>
+  <main>
+    <strong>Runtime Channel And Web Surface Events</strong>
+    <div class="status">
+      <div class="pill">Ping sent<strong id="pingCount">0</strong></div>
+      <div class="pill">Pong received<strong id="pongCount">0</strong></div>
+      <div class="pill">Surface events<strong id="surfaceCount">0</strong></div>
+    </div>
+    <button id="overlay">Open Overlay</button>
+    <button id="ping">Send Channel Ping</button>
+    <button id="surfaces">Check Web Surfaces</button>
+    <pre id="log">Loading...</pre>
+  </main>
+
+  <script src="/js/yoAnimeBridge.js"></script>
+  <script>
+    const baseChannelId = "sample.phase103.channel";
+    let channel = null;
+    let pingCount = 0;
+    let pongCount = 0;
+    let surfaceCount = 0;
+    const logLines = [];
+    const setText = (id, value) => { document.getElementById(id).textContent = String(value); };
+    const log = value => {
+      logLines.unshift(typeof value === "string" ? value : JSON.stringify(value, null, 2));
+      document.getElementById("log").textContent = logLines.slice(0, 8).join("\n\n");
+    };
+    const pulse = async (button, label, action) => {
+      const original = button.textContent;
+      button.disabled = true;
+      button.classList.add("busy");
+      button.textContent = label;
+      try {
+        const result = await action();
+        button.classList.remove("busy");
+        button.classList.add("flash");
+        button.classList.add("latched");
+        window.setTimeout(() => button.classList.remove("flash", "latched"), 900);
+        return result;
+      } finally {
+        button.disabled = false;
+        button.classList.remove("busy");
+        button.textContent = original;
+        button.focus({ preventScroll: true });
+      }
+    };
+    const run = async action => {
+      try { await action(); } catch (error) { console.error(error); log(error.message || String(error)); }
+    };
+    const resolveSurfaceChannelId = async () => {
+      const caps = await yoanime.runtime.getCapabilities().catch(() => null);
+      const surface = String(caps?.surface || yoanime.runtime.surface || "");
+      const suffix = surface.replace(/^TaskPane_/i, "").replace(/^InteractiveOverlay_/i, "");
+      return suffix ? `${baseChannelId}.${suffix}` : baseChannelId;
+    };
+
+    async function boot() {
+      await yoanime.runtime.ready();
+      const channelId = await resolveSurfaceChannelId();
+      channel = await yoanime.channels.open(channelId, { label: "Phase 103 Channel", ownerExtensionId: "sample.runtime-channel-websurface" });
+      channel.subscribe("*", event => {
+        if (event.event === "overlay.pong") {
+          pongCount += 1;
+          setText("pongCount", pongCount);
+          log({ status: "Pong received from overlay", channelEvent: event.event, payload: event.payload, sourceSurface: event.sourceSurface });
+          return;
+        }
+        log({ status: "Channel event observed", channelEvent: event.event, payload: event.payload, sourceSurface: event.sourceSurface });
+      });
+      yoanime.webSurface.onEvent(event => {
+        surfaceCount += 1;
+        setText("surfaceCount", surfaceCount);
+        log({ webSurfaceEvent: event.event, contentId: event.contentId, payload: event.payload, trust: event.trust });
+      });
+      document.getElementById("overlay").onclick = event => run(async () => {
+        await pulse(event.currentTarget, "Opening...", () => yoanime.overlay.show());
+        log("Overlay requested.");
+      });
+      document.getElementById("ping").onclick = event => run(async () => {
+        const sentAt = Date.now();
+        const result = await pulse(event.currentTarget, "Sending...", () => channel.publish("taskpane.ping", { at: sentAt }, { target: "peer" }));
+        pingCount += 1;
+        setText("pingCount", pingCount);
+        log({ status: "Ping sent to overlay. Waiting for automatic Pong.", sentAt, result });
+      });
+      document.getElementById("surfaces").onclick = event => run(async () => {
+        const result = await pulse(event.currentTarget, "Checking...", () => yoanime.webSurface.list());
+        log(result);
+      });
+      log(`Ready on ${channelId}. Open overlay, then insert or switch to a Web Surface to see events.`);
+    }
+    boot().catch(error => log(error.message || String(error)));
+  </script>
+</body>
+</html>

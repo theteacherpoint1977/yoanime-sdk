@@ -1,0 +1,31 @@
+{
+  "manifestVersion": 2,
+  "id": "sample.runtime-channel-websurface",
+  "name": "Sample Runtime Channel And Web Surface Events",
+  "version": "0.1.0",
+  "author": "yoAnime",
+  "description": "Demonstrates runtime channels, taskpane/overlay messaging, and Web Surface event subscriptions.",
+  "surface": "overlay-taskpane",
+  "entry": "overlay.html",
+  "taskPaneEntry": "taskpane.html",
+  "sdkVersionMin": "0.3.0",
+  "permissions": [
+    "selection.read",
+    "scene.read",
+    "interaction.write",
+    "surface.messaging",
+    "websurface.read"
+  ],
+  "capabilities": [
+    "taskpane.surface",
+    "overlay.surface",
+    "surface.messaging"
+  ],
+  "gallery": {
+    "category": "developer-sample",
+    "tags": ["runtime-channel", "websurface", "overlay"],
+    "license": "MIT",
+    "channel": "stable",
+    "changelog": "Phase 103 developer sample."
+  }
+}

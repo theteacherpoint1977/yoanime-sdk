@@ -1,0 +1,112 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Procedural Provider Pack</title>
+  <style>
+    body { margin: 0; font-family: Segoe UI, Arial, sans-serif; background: #111827; color: #f9fafb; }
+    main { padding: 14px; display: grid; gap: 10px; }
+    button { border: 1px solid #38bdf8; background: #0369a1; color: white; padding: 8px 10px; border-radius: 6px; cursor: pointer; }
+    pre { min-height: 220px; white-space: pre-wrap; background: #0b1120; border: 1px solid #334155; border-radius: 6px; padding: 10px; font-size: 12px; }
+  </style>
+</head>
+<body>
+  <main>
+    <strong>Procedural Provider Pack</strong>
+    <button id="register">Register Pack</button>
+    <button id="query">Query Scene</button>
+    <button id="bake">Bake Selected</button>
+    <button id="unregister">Unregister Pack</button>
+    <pre id="log">Loading...</pre>
+  </main>
+
+  <script src="/js/yoAnimeBridge.js"></script>
+  <script>
+    const packId = "sample.phase103.procedural-pack";
+    const providerId = `${packId}.selected-hop`;
+    const log = value => {
+      document.getElementById("log").textContent =
+        typeof value === "string" ? value : JSON.stringify(value, null, 2);
+    };
+    const run = async action => {
+      try { await action(); } catch (error) { console.error(error); log(error.message || String(error)); }
+    };
+
+    async function registerPack() {
+      const pack = {
+        id: packId,
+        label: "Phase 103 Procedural Pack",
+        version: "0.1.0",
+        ownerExtensionId: "sample.procedural-provider-pack",
+        sharedInputs: {
+          amount: { type: "range", label: "Hop Amount", min: 8, max: 100, default: 36 },
+          durationSeconds: { type: "duration", label: "Duration", default: 1.1 }
+        },
+        providers: [{
+          id: providerId,
+          label: "Selected Shape Hop",
+          kind: "custom",
+          tags: ["phase103", "generated-motion-ir", "scene-query"],
+          generate: async context => {
+            const selected = await context.query("selected");
+            const node = selected[0] || context.selection?.primary || context.selection?.shape || context.selection;
+            const runtimeNodeId = node?.runtimeNodeId || node?.id;
+            if (!runtimeNodeId) throw new Error("Select a PowerPoint shape first.");
+            const bounds = node.bounds || node.slideBounds || {};
+            const startY = Number(bounds.top ?? bounds.y ?? node.y ?? 0);
+            const amount = Number(context.options?.amount ?? 36);
+            const durationSeconds = Number(context.options?.durationSeconds ?? 1.1);
+            return {
+              contractVersion: "generated-motion.v1",
+              label: "Selected Shape Hop",
+              durationSeconds,
+              seed: "phase103-provider-pack",
+              deterministic: true,
+              clear: ["PositionY"],
+              layers: [{
+                runtimeNodeId,
+                properties: {
+                  PositionY: {
+                    durationSeconds,
+                    keyframes: [
+                      { normalizedTime: 0, value: { number: startY } },
+                      { normalizedTime: 0.45, value: { number: startY - amount } },
+                      { normalizedTime: 1, value: { number: startY } }
+                    ]
+                  }
+                }
+              }],
+              diagnostics: [{ level: "info", code: "phase103.provider-pack", message: `Generated hop for ${runtimeNodeId}.` }]
+            };
+          }
+        }]
+      };
+      const validation = yoanime.motionProviders.validatePack(pack);
+      if (!validation.success) { log(validation); return; }
+      log(await yoanime.motionProviders.registerPack(pack, { replace: true }));
+    }
+
+    async function queryScene() {
+      const selected = await yoanime.scene.query("selected");
+      const visible = await yoanime.scene.query({ visible: true }, { limit: 10 });
+      log({ selected, visibleCount: visible.count ?? visible.length, diagnostics: visible.diagnostics || [] });
+    }
+
+    async function bakeSelected() {
+      const result = await yoanime.motionProviders.bake(providerId, { amount: 42, durationSeconds: 1.1, play: true });
+      log(result);
+    }
+
+    async function boot() {
+      await yoanime.runtime.ready();
+      document.getElementById("register").onclick = () => run(registerPack);
+      document.getElementById("query").onclick = () => run(queryScene);
+      document.getElementById("bake").onclick = () => run(bakeSelected);
+      document.getElementById("unregister").onclick = () => run(async () => log(yoanime.motionProviders.unregisterPack(packId)));
+      log("Ready. Select a shape, then Register Pack and Bake Selected.");
+    }
+    boot().catch(error => log(error.message || String(error)));
+  </script>
+</body>
+</html>

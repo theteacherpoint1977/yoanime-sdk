@@ -1,0 +1,118 @@
+﻿<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Runtime Channel Overlay</title>
+  <style>
+    html, body { margin: 0; width: 100%; height: 100%; background: transparent; font-family: Segoe UI, Arial, sans-serif; }
+    #panel { position: fixed; right: 16px; bottom: 16px; width: 340px; padding: 12px; display: grid; gap: 8px; color: #f8fafc; background: rgba(15, 23, 42, 0.88); border: 1px solid rgba(167, 139, 250, 0.65); border-radius: 8px; }
+    .status { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; }
+    .pill { border: 1px solid rgba(148, 163, 184, 0.55); background: rgba(15, 23, 42, 0.72); border-radius: 6px; padding: 7px; font-size: 11px; }
+    .pill strong { display: block; color: #a7f3d0; font-size: 15px; }
+    button { border: 1px solid #a78bfa; background: #6d28d9; color: white; padding: 8px 10px; border-radius: 6px; cursor: pointer; transition: transform 120ms ease, filter 120ms ease, background 120ms ease, box-shadow 120ms ease; }
+    button:focus, button.latched { outline: none; box-shadow: 0 0 0 3px rgba(167, 139, 250, 0.45); }
+    button:active, button.busy { transform: translateY(1px) scale(0.99); filter: brightness(1.2); }
+    button.flash { background: #059669; border-color: #34d399; }
+    pre { margin: 0; white-space: pre-wrap; font-size: 12px; }
+  </style>
+</head>
+<body>
+  <section id="panel" data-yoanime-interactive="true">
+    <strong>Overlay Channel</strong>
+    <div class="status">
+      <div class="pill">Ping received<strong id="pingCount">0</strong></div>
+      <div class="pill">Pong sent<strong id="pongCount">0</strong></div>
+    </div>
+    <button id="pong" data-yoanime-interactive="true">Publish Pong</button>
+    <pre id="log">Loading...</pre>
+  </section>
+
+  <script src="/js/yoAnimeBridge.js"></script>
+  <script src="/Runtime/yoAnimeOverlayInteraction.js"></script>
+  <script>
+    const baseChannelId = "sample.phase103.channel";
+    let pingCount = 0;
+    let pongCount = 0;
+    const setText = (id, value) => { document.getElementById(id).textContent = String(value); };
+    const log = value => {
+      document.getElementById("log").textContent = typeof value === "string" ? value : JSON.stringify(value, null, 2);
+    };
+    const refreshInteractiveBounds = () => {
+      window.yoAnimeOverlayInteraction?.reportBounds?.();
+      window.yoAnimeBridge?.sendBoundsToHost?.();
+    };
+    const resolveSurfaceChannelId = async () => {
+      const caps = await yoanime.runtime.getCapabilities().catch(() => null);
+      const surface = String(caps?.surface || yoanime.runtime.surface || "");
+      const suffix = surface.replace(/^TaskPane_/i, "").replace(/^InteractiveOverlay_/i, "");
+      return suffix ? `${baseChannelId}.${suffix}` : baseChannelId;
+    };
+    const publishPong = async (channel, reason) => {
+      const sentAt = Date.now();
+      const result = await channel.publish("overlay.pong", { at: sentAt, reason }, { target: "peer" });
+      pongCount += 1;
+      setText("pongCount", pongCount);
+      return { sentAt, result };
+    };
+    const pulse = async (button, label, action) => {
+      const original = button.textContent;
+      button.disabled = true;
+      button.classList.add("busy");
+      button.textContent = label;
+      try {
+        const result = await action();
+        button.classList.remove("busy");
+        button.classList.add("flash");
+        button.classList.add("latched");
+        window.setTimeout(() => button.classList.remove("flash", "latched"), 900);
+        refreshInteractiveBounds();
+        return result;
+      } finally {
+        button.disabled = false;
+        button.classList.remove("busy");
+        button.textContent = original;
+        button.focus({ preventScroll: true });
+        refreshInteractiveBounds();
+      }
+    };
+    async function boot() {
+      await yoanime.runtime.ready();
+      window.yoAnimeOverlayInteraction?.init({
+        containerId: "panel",
+        interactiveSelectors: ["#panel", "#panel *"]
+      });
+      refreshInteractiveBounds();
+      [100, 300, 800].forEach(delay => window.setTimeout(refreshInteractiveBounds, delay));
+      const channelId = await resolveSurfaceChannelId();
+      const channel = await yoanime.channels.open(channelId, { label: "Phase 103 Channel", ownerExtensionId: "sample.runtime-channel-websurface" });
+      channel.subscribe("*", async event => {
+        if (event.event === "taskpane.ping") {
+          pingCount += 1;
+          setText("pingCount", pingCount);
+          log({ status: "Ping received. Sending automatic Pong...", received: event.event, payload: event.payload, sourceSurface: event.sourceSurface });
+          try {
+            const pong = await publishPong(channel, "auto-reply");
+            log({ status: "Automatic Pong sent to taskpane", received: event.event, payload: event.payload, pong });
+            refreshInteractiveBounds();
+            [50, 150, 350].forEach(delay => window.setTimeout(refreshInteractiveBounds, delay));
+          } catch (error) {
+            log({ status: "Automatic Pong failed", error: error.message || String(error) });
+            refreshInteractiveBounds();
+          }
+          return;
+        }
+        log({ status: "Channel event observed", received: event.event, payload: event.payload, sourceSurface: event.sourceSurface });
+        refreshInteractiveBounds();
+      });
+      document.getElementById("pong").onclick = async event => {
+        const pong = await pulse(event.currentTarget, "Publishing...", () => publishPong(channel, "manual-button"));
+        log({ status: "Manual Pong published to taskpane", pong });
+      };
+      log(`Ready on ${channelId}. Waiting for taskpane ping.`);
+    }
+    boot().catch(error => log(error.message || String(error)));
+  </script>
+</body>
+</html>
+

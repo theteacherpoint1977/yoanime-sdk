@@ -1,0 +1,36 @@
+{
+  "manifestVersion": 2,
+  "id": "shape-choreographer",
+  "name": "Shape Choreographer",
+  "version": "1.0.0",
+  "author": "yoAnime Developer",
+  "description": "Multi-shape entrance animation composer. Select shapes on your slide, assign entrance presets, adjust timing offsets in the overlay timeline, then bake and play as a coordinated sequence.",
+  "surface": "overlay-taskpane",
+  "entry": "overlay.html",
+  "taskPaneEntry": "taskpane.html",
+  "sdkVersionMin": "0.3.0",
+  "permissions": [
+    "selection.read",
+    "scene.read",
+    "scene.write",
+    "geometry.read",
+    "timeline.read",
+    "timeline.write",
+    "timeline.playback",
+    "interaction.write",
+    "surface.messaging",
+    "extensions.read"
+  ],
+  "capabilities": [
+    "overlay.surface",
+    "taskpane.surface",
+    "surface.messaging"
+  ],
+  "gallery": {
+    "category": "animation",
+    "tags": ["entrance", "choreography", "timeline", "multi-shape", "sequencer"],
+    "license": "MIT",
+    "channel": "stable",
+    "changelog": "1.0.0 — Initial release. Multi-shape entrance sequencer with overlay timing editor."
+  }
+}

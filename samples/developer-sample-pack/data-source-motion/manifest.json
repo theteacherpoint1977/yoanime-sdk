@@ -1,0 +1,27 @@
+{
+  "manifestVersion": 2,
+  "id": "sample.data-source-motion",
+  "name": "Sample Data Source Motion",
+  "version": "0.1.0",
+  "author": "yoAnime",
+  "description": "Demonstrates data source registration and data-driven Generated Motion IR.",
+  "surface": "taskpane",
+  "taskPaneEntry": "taskpane.html",
+  "sdkVersionMin": "0.3.0",
+  "permissions": [
+    "selection.read",
+    "scene.read",
+    "timeline.write",
+    "timeline.playback"
+  ],
+  "capabilities": [
+    "taskpane.surface"
+  ],
+  "gallery": {
+    "category": "developer-sample",
+    "tags": ["data-source", "generated-motion-ir", "provider"],
+    "license": "MIT",
+    "channel": "stable",
+    "changelog": "Phase 103 developer sample."
+  }
+}

@@ -1,0 +1,75 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Lottie And AI Motion</title>
+  <style>
+    body { margin: 0; font-family: Segoe UI, Arial, sans-serif; background: #24122f; color: #fff7ed; }
+    main { padding: 14px; display: grid; gap: 10px; }
+    button { border: 1px solid #f0abfc; background: #a21caf; color: white; padding: 8px 10px; border-radius: 6px; cursor: pointer; }
+    pre { min-height: 240px; white-space: pre-wrap; background: #1e0b2d; border: 1px solid #c084fc; border-radius: 6px; padding: 10px; font-size: 12px; }
+  </style>
+</head>
+<body>
+  <main>
+    <strong>Lottie And AI Motion</strong>
+    <button id="layers">List Lottie Layers</button>
+    <button id="lottie">Bake Lottie</button>
+    <button id="ai">Bake AI Prompt</button>
+    <pre id="log">Loading...</pre>
+  </main>
+
+  <script src="/js/yoAnimeBridge.js"></script>
+  <script>
+    const lottieJson = {
+      v: "5.12.0",
+      fr: 30,
+      ip: 0,
+      op: 45,
+      nm: "Phase 103 Lottie Demo",
+      layers: [{
+        ind: 1,
+        ty: 4,
+        nm: "Sample Mover",
+        ks: {
+          p: { k: [{ t: 0, s: [100, 100, 0] }, { t: 22, s: [220, 60, 0] }, { t: 45, s: [340, 130, 0] }] },
+          r: { k: [{ t: 0, s: [0] }, { t: 45, s: [20] }] },
+          s: { k: [{ t: 0, s: [100, 100, 100] }, { t: 22, s: [125, 125, 100] }, { t: 45, s: [100, 100, 100] }] }
+        }
+      }]
+    };
+    const log = value => {
+      document.getElementById("log").textContent = typeof value === "string" ? value : JSON.stringify(value, null, 2);
+    };
+    const run = async action => {
+      try { await action(); } catch (error) { console.error(error); log(error.message || String(error)); }
+    };
+    async function boot() {
+      await yoanime.runtime.ready();
+      document.getElementById("layers").onclick = () => run(async () => log(yoanime.lottie.listLayers(lottieJson)));
+      document.getElementById("lottie").onclick = () => run(async () => log(await yoanime.motionProviders.bake("yoanime.lottie.transform", {
+        lottieJson,
+        layerIndex: 0,
+        positionMode: "relative",
+        scale: 0.5,
+        play: true
+      })));
+      document.getElementById("ai").onclick = () => run(async () => {
+        const request = {
+          prompt: "Make this shape bounce, spin, and pulse like a playful product launch",
+          seed: "phase103-ai-demo",
+          durationSeconds: 1.2,
+          play: true
+        };
+        log({
+          explanation: yoanime.ai.explainPrompt(request),
+          bake: await yoanime.motionProviders.bake("yoanime.ai.prompt-motion", request)
+        });
+      });
+      log("Ready. Select a shape, then bake Lottie or AI prompt motion.");
+    }
+    boot().catch(error => log(error.message || String(error)));
+  </script>
+</body>
+</html>

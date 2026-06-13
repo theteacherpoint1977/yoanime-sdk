@@ -1,0 +1,817 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Shape Choreographer Overlay</title>
+  <style>
+    /* ── Reset & tokens ─────────────────────────────────────────── */
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --bg:      transparent;
+      --panel-bg:  rgba(13, 17, 23, 0.92);
+      --surface:   rgba(22, 27, 34, 0.96);
+      --surface2:  rgba(33, 38, 45, 0.98);
+      --border:    rgba(48, 54, 61, 0.9);
+      --border2:   rgba(68, 76, 86, 0.9);
+      --text:      #e6edf3;
+      --muted:     #8b949e;
+      --accent:    #388bfd;
+      --success:   #3fb950;
+      --danger:    #f85149;
+      --warn:      #d29922;
+      --ruler-h:   20px;
+      --track-h:   36px;
+      --label-w:   148px;
+      --radius:    7px;
+    }
+
+    html, body {
+      width: 100%; height: 100%;
+      background: var(--bg);
+      overflow: hidden;
+      font-family: "Segoe UI", system-ui, sans-serif;
+      font-size: 12px;
+      color: var(--text);
+      user-select: none;
+    }
+
+    /* ── Main panel (anchored bottom-right) ─────────────────────── */
+    #panel {
+      position: fixed;
+      bottom: 20px;
+      right: 20px;
+      width: 620px;
+      max-width: calc(100vw - 32px);
+      background: var(--panel-bg);
+      border: 1px solid var(--border2);
+      border-radius: var(--radius);
+      backdrop-filter: blur(12px);
+      -webkit-backdrop-filter: blur(12px);
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+      box-shadow: 0 8px 32px rgba(0,0,0,0.55);
+    }
+
+    /* ── Panel header ────────────────────────────────────────────── */
+    .panel-header {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      padding: 8px 12px;
+      border-bottom: 1px solid var(--border);
+      flex-shrink: 0;
+      cursor: move;
+    }
+    .panel-title {
+      font-size: 12px;
+      font-weight: 600;
+      color: var(--text);
+    }
+    .panel-status {
+      font-size: 11px;
+      color: var(--muted);
+      margin-left: auto;
+    }
+    .panel-close {
+      background: none;
+      border: none;
+      color: var(--muted);
+      font-size: 16px;
+      cursor: pointer;
+      padding: 0 4px;
+      border-radius: 4px;
+      line-height: 1;
+      transition: color 100ms, background 100ms;
+    }
+    .panel-close:hover { color: var(--text); background: rgba(255,255,255,0.08); }
+
+    /* ── Toolbar ─────────────────────────────────────────────────── */
+    .toolbar {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      padding: 6px 12px;
+      border-bottom: 1px solid var(--border);
+      flex-shrink: 0;
+    }
+    .toolbar-btn {
+      background: var(--surface2);
+      border: 1px solid var(--border2);
+      color: var(--text);
+      border-radius: 5px;
+      padding: 4px 9px;
+      font-size: 11px;
+      cursor: pointer;
+      transition: filter 120ms, transform 80ms;
+    }
+    .toolbar-btn:hover { filter: brightness(1.2); }
+    .toolbar-btn:active { transform: scale(0.97); }
+    .toolbar-btn.accent { background: #1f6feb; border-color: transparent; }
+    .toolbar-btn.green  { background: #238636; border-color: transparent; }
+    .toolbar-btn.danger { background: #b91c1c; border-color: transparent; }
+    .toolbar-btn:disabled { opacity: 0.4; cursor: not-allowed; }
+    .toolbar-sep {
+      width: 1px; height: 16px;
+      background: var(--border);
+      margin: 0 2px;
+      flex-shrink: 0;
+    }
+    .toolbar-zoom {
+      display: flex;
+      align-items: center;
+      gap: 4px;
+      font-size: 11px;
+      color: var(--muted);
+      margin-left: auto;
+    }
+    .toolbar-zoom button {
+      background: none;
+      border: 1px solid var(--border2);
+      color: var(--text);
+      width: 20px; height: 20px;
+      border-radius: 4px;
+      cursor: pointer;
+      font-size: 13px;
+      line-height: 1;
+      display: flex; align-items: center; justify-content: center;
+    }
+
+    /* ── Timeline area ───────────────────────────────────────────── */
+    .timeline-wrap {
+      flex: 1;
+      overflow-y: auto;
+      overflow-x: hidden;
+      max-height: 280px;
+      min-height: 80px;
+    }
+    .timeline-empty {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      height: 100px;
+      color: var(--muted);
+      font-size: 12px;
+      gap: 8px;
+    }
+
+    /* Ruler */
+    .ruler-row {
+      display: flex;
+      position: sticky;
+      top: 0;
+      z-index: 10;
+      background: var(--surface);
+      border-bottom: 1px solid var(--border);
+      flex-shrink: 0;
+    }
+    .ruler-label-spacer {
+      width: var(--label-w);
+      flex-shrink: 0;
+      border-right: 1px solid var(--border);
+    }
+    .ruler-canvas-wrap {
+      flex: 1;
+      position: relative;
+      height: var(--ruler-h);
+      overflow: hidden;
+    }
+    canvas.ruler-canvas {
+      display: block;
+    }
+
+    /* Track rows */
+    .track-row {
+      display: flex;
+      align-items: center;
+      border-bottom: 1px solid var(--border);
+      height: var(--track-h);
+      flex-shrink: 0;
+    }
+    .track-row:hover { background: rgba(255,255,255,0.025); }
+
+    .track-label {
+      width: var(--label-w);
+      flex-shrink: 0;
+      padding: 0 10px 0 8px;
+      border-right: 1px solid var(--border);
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      overflow: hidden;
+    }
+    .track-label-icon {
+      width: 18px; height: 18px;
+      border-radius: 50%;
+      display: flex; align-items: center; justify-content: center;
+      font-size: 10px;
+      flex-shrink: 0;
+    }
+    .track-label-name {
+      font-size: 11px;
+      font-weight: 500;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+      flex: 1;
+    }
+
+    /* Lane (draggable area) */
+    .track-lane {
+      flex: 1;
+      position: relative;
+      height: 100%;
+      cursor: default;
+    }
+
+    /* Animation bar */
+    .anim-bar {
+      position: absolute;
+      top: 5px;
+      height: calc(100% - 10px);
+      border-radius: 4px;
+      cursor: ew-resize;
+      display: flex;
+      align-items: center;
+      overflow: hidden;
+      box-shadow: 0 1px 4px rgba(0,0,0,0.4);
+      border: 1px solid rgba(255,255,255,0.15);
+      transition: filter 80ms;
+    }
+    .anim-bar:hover { filter: brightness(1.15); }
+    .anim-bar.dragging { filter: brightness(1.3); cursor: grabbing; z-index: 20; }
+    .anim-bar-label {
+      padding: 0 7px;
+      font-size: 10px;
+      font-weight: 600;
+      color: rgba(255,255,255,0.9);
+      white-space: nowrap;
+      overflow: hidden;
+      pointer-events: none;
+    }
+
+    /* Left resize handle */
+    .anim-bar-handle-left,
+    .anim-bar-handle-right {
+      position: absolute;
+      top: 0; bottom: 0;
+      width: 7px;
+      cursor: ew-resize;
+      background: rgba(255,255,255,0.2);
+    }
+    .anim-bar-handle-left  { left: 0;  border-radius: 4px 0 0 4px; }
+    .anim-bar-handle-right { right: 0; border-radius: 0 4px 4px 0; }
+
+    /* Playhead */
+    .playhead {
+      position: absolute;
+      top: 0; bottom: 0;
+      width: 2px;
+      background: #f85149;
+      pointer-events: none;
+      z-index: 30;
+    }
+    .playhead::before {
+      content: "";
+      position: absolute;
+      top: -1px; left: -4px;
+      border: 5px solid transparent;
+      border-top-color: #f85149;
+    }
+
+    /* ── Log strip ───────────────────────────────────────────────── */
+    .log-strip {
+      padding: 4px 12px;
+      font-size: 10.5px;
+      font-family: monospace;
+      color: var(--muted);
+      border-top: 1px solid var(--border);
+      min-height: 22px;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+    .log-strip.ok    { color: var(--success); }
+    .log-strip.error { color: var(--danger); }
+    .log-strip.warn  { color: var(--warn); }
+  </style>
+</head>
+<body>
+  <!-- The entire panel is interactive -->
+  <div id="panel" data-yoanime-interactive="true">
+
+    <div class="panel-header" id="panelHeader">
+      <span>🎬</span>
+      <span class="panel-title">Shape Choreographer — Timing Editor</span>
+      <span class="panel-status" id="overlayStatus">Waiting for taskpane…</span>
+      <button class="panel-close" id="btnClose" title="Close overlay">✕</button>
+    </div>
+
+    <div class="toolbar">
+      <button class="toolbar-btn" id="btnReapplyStagger" title="Re-apply stagger spacing to all tracks">⟳ Stagger</button>
+      <div class="toolbar-sep"></div>
+      <button class="toolbar-btn green" id="btnBake" disabled title="Bake all tracks and play">▶ Bake &amp; Play</button>
+      <button class="toolbar-btn danger" id="btnClear" title="Clear all tracks">⊗ Clear</button>
+      <div class="toolbar-zoom">
+        Zoom <button id="btnZoomOut">−</button>
+        <span id="zoomLabel">1×</span>
+        <button id="btnZoomIn">+</button>
+      </div>
+    </div>
+
+    <div class="timeline-wrap" id="timelineWrap">
+      <div class="timeline-empty" id="timelineEmpty">
+        Open taskpane → select shapes → click ＋ Add
+      </div>
+      <div id="rulerRow" class="ruler-row" style="display:none">
+        <div class="ruler-label-spacer"></div>
+        <div class="ruler-canvas-wrap" id="rulerCanvasWrap">
+          <canvas class="ruler-canvas" id="rulerCanvas"></canvas>
+        </div>
+      </div>
+      <div id="trackRows"></div>
+    </div>
+
+    <div class="log-strip" id="overlayLog">Loading…</div>
+  </div>
+
+  <script src="/js/yoAnimeBridge.js"></script>
+  <script src="/Runtime/yoAnimeOverlayInteraction.js"></script>
+  <script src="./assets/choreographer-shared.js"></script>
+  <script>
+  (() => {
+    "use strict";
+
+    const { PRESETS, CHANNEL_ID, MSG,
+            DEFAULT_STAGGER_SECONDS, TIMELINE_WIDTH_SECONDS } = window.CHOREOGRAPHER;
+
+    // ── DOM refs ──────────────────────────────────────────────────────────────
+    const $panel            = document.getElementById("panel");
+    const $trackRows        = document.getElementById("trackRows");
+    const $rulerRow         = document.getElementById("rulerRow");
+    const $rulerCanvas      = document.getElementById("rulerCanvas");
+    const $rulerCanvasWrap  = document.getElementById("rulerCanvasWrap");
+    const $timelineEmpty    = document.getElementById("timelineEmpty");
+    const $overlayStatus    = document.getElementById("overlayStatus");
+    const $overlayLog       = document.getElementById("overlayLog");
+    const $btnClose         = document.getElementById("btnClose");
+    const $btnBake          = document.getElementById("btnBake");
+    const $btnClear         = document.getElementById("btnClear");
+    const $btnReapplyStagger= document.getElementById("btnReapplyStagger");
+    const $btnZoomIn        = document.getElementById("btnZoomIn");
+    const $btnZoomOut       = document.getElementById("btnZoomOut");
+    const $zoomLabel        = document.getElementById("zoomLabel");
+
+    // ── State ──────────────────────────────────────────────────────────────────
+    let tracks = [];          // mirror of taskpane tracks
+    let stagger = DEFAULT_STAGGER_SECONDS;
+    let totalDuration = TIMELINE_WIDTH_SECONDS;
+    let zoomLevel = 1;        // 1 = TIMELINE_WIDTH_SECONDS fits lane
+    let channel = null;
+    let playheadSeconds = 0;
+    let playheadRaf = null;
+
+    // ── Logging ────────────────────────────────────────────────────────────────
+    function log(msg, kind = "") {
+      $overlayLog.textContent = msg;
+      $overlayLog.className = "log-strip" + (kind ? " " + kind : "");
+    }
+
+    // ── Zoom ───────────────────────────────────────────────────────────────────
+    const ZOOM_STEPS = [0.5, 0.75, 1, 1.5, 2, 3, 4];
+    let zoomIdx = 2; // default 1×
+
+    function applyZoom() {
+      zoomLevel = ZOOM_STEPS[zoomIdx];
+      $zoomLabel.textContent = zoomLevel + "×";
+      renderRuler();
+      renderTrackBars();
+    }
+    $btnZoomIn.addEventListener("click", () => {
+      zoomIdx = Math.min(zoomIdx + 1, ZOOM_STEPS.length - 1);
+      applyZoom();
+    });
+    $btnZoomOut.addEventListener("click", () => {
+      zoomIdx = Math.max(zoomIdx - 1, 0);
+      applyZoom();
+    });
+
+    // ── Lane geometry helpers ──────────────────────────────────────────────────
+    function laneWidth() {
+      const wrap = $rulerCanvasWrap;
+      return wrap.offsetWidth || 400;
+    }
+
+    function secondsToPixels(s) {
+      const dur = totalDuration / zoomLevel;
+      return (s / dur) * laneWidth();
+    }
+
+    function pixelsToSeconds(px) {
+      const dur = totalDuration / zoomLevel;
+      return (px / laneWidth()) * dur;
+    }
+
+    // ── Ruler drawing ──────────────────────────────────────────────────────────
+    function renderRuler() {
+      const W = laneWidth();
+      const H = 20;
+      $rulerCanvas.width = W;
+      $rulerCanvas.height = H;
+      const ctx = $rulerCanvas.getContext("2d");
+      ctx.clearRect(0, 0, W, H);
+
+      const dur = totalDuration / zoomLevel;
+      // Choose a good tick interval
+      const rawInterval = dur / 8;
+      const nice = [0.05, 0.1, 0.2, 0.25, 0.5, 1, 2, 5].find(v => v >= rawInterval) || 1;
+
+      ctx.fillStyle = "#8b949e";
+      ctx.font = "9px Segoe UI, sans-serif";
+      ctx.textAlign = "center";
+
+      for (let t = 0; t <= dur + nice * 0.5; t += nice) {
+        const x = (t / dur) * W;
+        if (x < 0 || x > W + 2) continue;
+        const isMajor = Math.round(t / nice) % 2 === 0;
+        ctx.fillStyle = isMajor ? "#8b949e" : "#444c56";
+        ctx.fillRect(Math.round(x), isMajor ? 8 : 12, 1, H - (isMajor ? 8 : 12));
+        if (isMajor) {
+          ctx.fillStyle = "#8b949e";
+          const label = t < 1 ? (t * 1000 | 0) + "ms" : t.toFixed(1) + "s";
+          ctx.fillText(label, Math.round(x), 7);
+        }
+      }
+    }
+
+    // ── Track bar rendering ────────────────────────────────────────────────────
+    function renderTracks() {
+      const hasTracks = tracks.length > 0;
+      $timelineEmpty.style.display = hasTracks ? "none" : "flex";
+      $rulerRow.style.display = hasTracks ? "flex" : "none";
+      $btnBake.disabled = !hasTracks;
+      $trackRows.innerHTML = "";
+
+      if (!hasTracks) return;
+
+      renderRuler();
+
+      tracks.forEach((track, i) => {
+        const preset = PRESETS[track.presetId] || PRESETS["fade-in"];
+        const row = document.createElement("div");
+        row.className = "track-row";
+        row.dataset.nodeId = track.runtimeNodeId;
+
+        const labelDiv = document.createElement("div");
+        labelDiv.className = "track-label";
+        labelDiv.innerHTML = `
+          <div class="track-label-icon" style="background:${preset.color}22;color:${preset.color}">
+            ${preset.icon}
+          </div>
+          <span class="track-label-name" title="${track.name}">${track.name}</span>
+        `;
+
+        const laneDiv = document.createElement("div");
+        laneDiv.className = "track-lane";
+        laneDiv.dataset.idx = i;
+
+        // Build the animation bar
+        const bar = buildAnimBar(track, i, preset);
+        laneDiv.appendChild(bar);
+
+        // Playhead overlay
+        const ph = document.createElement("div");
+        ph.className = "playhead";
+        ph.style.left = secondsToPixels(playheadSeconds) + "px";
+        ph.dataset.ph = "1";
+        laneDiv.appendChild(ph);
+
+        row.appendChild(labelDiv);
+        row.appendChild(laneDiv);
+        $trackRows.appendChild(row);
+      });
+    }
+
+    // Re-positions bar elements without full DOM rebuild
+    function renderTrackBars() {
+      const bars = $trackRows.querySelectorAll(".anim-bar");
+      bars.forEach((bar, i) => {
+        if (!tracks[i]) return;
+        const t = tracks[i];
+        bar.style.left  = secondsToPixels(t.offsetSeconds) + "px";
+        bar.style.width = secondsToPixels(t.durationSeconds) + "px";
+      });
+      renderRuler();
+    }
+
+    function buildAnimBar(track, idx, preset) {
+      const bar = document.createElement("div");
+      bar.className = "anim-bar";
+      bar.dataset.idx = idx;
+      bar.style.left       = secondsToPixels(track.offsetSeconds) + "px";
+      bar.style.width      = secondsToPixels(track.durationSeconds) + "px";
+      bar.style.background = preset.color + "cc";
+
+      bar.innerHTML = `
+        <div class="anim-bar-handle-left"  data-role="left"  data-idx="${idx}"></div>
+        <div class="anim-bar-label">${preset.icon} ${Math.round(track.durationSeconds * 1000)}ms</div>
+        <div class="anim-bar-handle-right" data-role="right" data-idx="${idx}"></div>
+      `;
+
+      // ── Drag to move offset ──────────────────────────────────────────────────
+      let dragStart = null;
+
+      const onMouseMove = e => {
+        if (!dragStart) return;
+        const dx = e.clientX - dragStart.clientX;
+        const dSec = pixelsToSeconds(dx);
+        const newOffset = Math.max(0, dragStart.origOffset + dSec);
+        tracks[idx].offsetSeconds = +newOffset.toFixed(3);
+        bar.style.left = secondsToPixels(newOffset) + "px";
+        bar.querySelector(".anim-bar-label").textContent =
+          `${preset.icon} +${newOffset.toFixed(2)}s`;
+      };
+
+      const onMouseUp = () => {
+        if (!dragStart) return;
+        bar.classList.remove("dragging");
+        document.removeEventListener("mousemove", onMouseMove);
+        document.removeEventListener("mouseup", onMouseUp);
+        dragStart = null;
+        notifyOffsetChanged(idx);
+      };
+
+      bar.addEventListener("mousedown", e => {
+        // Only drag on the bar body, not handles
+        if (e.target.dataset.role) return;
+        e.preventDefault();
+        dragStart = { clientX: e.clientX, origOffset: tracks[idx].offsetSeconds };
+        bar.classList.add("dragging");
+        document.addEventListener("mousemove", onMouseMove);
+        document.addEventListener("mouseup", onMouseUp);
+      });
+
+      // ── Right-handle drag to resize duration ─────────────────────────────────
+      let resizeDrag = null;
+
+      const onResizeMove = e => {
+        if (!resizeDrag) return;
+        const dx = e.clientX - resizeDrag.clientX;
+        const dSec = pixelsToSeconds(dx);
+        const newDur = Math.max(0.1, resizeDrag.origDur + dSec);
+        tracks[idx].durationSeconds = +newDur.toFixed(3);
+        bar.style.width = secondsToPixels(newDur) + "px";
+        bar.querySelector(".anim-bar-label").textContent =
+          `${preset.icon} ${Math.round(newDur * 1000)}ms`;
+      };
+
+      const onResizeUp = () => {
+        if (!resizeDrag) return;
+        document.removeEventListener("mousemove", onResizeMove);
+        document.removeEventListener("mouseup", onResizeUp);
+        resizeDrag = null;
+        notifyDurationChanged(idx);
+      };
+
+      const rightHandle = bar.querySelector("[data-role='right']");
+      rightHandle.addEventListener("mousedown", e => {
+        e.preventDefault();
+        e.stopPropagation();
+        resizeDrag = { clientX: e.clientX, origDur: tracks[idx].durationSeconds };
+        document.addEventListener("mousemove", onResizeMove);
+        document.addEventListener("mouseup", onResizeUp);
+      });
+
+      return bar;
+    }
+
+    // ── Channel messaging ──────────────────────────────────────────────────────
+    async function notifyOffsetChanged(idx) {
+      const t = tracks[idx];
+      if (!channel) return;
+      await channel.publish(MSG.OFFSET_CHANGED, {
+        runtimeNodeId: t.runtimeNodeId,
+        offsetSeconds: t.offsetSeconds
+      }, { target: "peer" }).catch(() => {});
+      log(`${t.name} offset → ${t.offsetSeconds.toFixed(2)}s`);
+    }
+
+    async function notifyDurationChanged(idx) {
+      const t = tracks[idx];
+      if (!channel) return;
+      await channel.publish(MSG.DURATION_CHANGED, {
+        runtimeNodeId: t.runtimeNodeId,
+        durationSeconds: t.durationSeconds
+      }, { target: "peer" }).catch(() => {});
+      log(`${t.name} duration → ${t.durationSeconds.toFixed(2)}s`);
+    }
+
+    // ── Apply stagger ──────────────────────────────────────────────────────────
+    function applyStagger() {
+      tracks.forEach((t, i) => { t.offsetSeconds = +(i * stagger).toFixed(3); });
+      renderTracks();
+      if (channel) {
+        // Broadcast all offset changes at once
+        tracks.forEach((t, i) => {
+          channel.publish(MSG.OFFSET_CHANGED, {
+            runtimeNodeId: t.runtimeNodeId,
+            offsetSeconds: t.offsetSeconds
+          }, { target: "peer" }).catch(() => {});
+        });
+      }
+      log(`Stagger ${stagger}s applied to ${tracks.length} tracks.`, "ok");
+    }
+
+    // ── Bake (forwarded to taskpane via channel) ───────────────────────────────
+    // The overlay does NOT bake directly — it relies on the taskpane having the
+    // slideCtx and scene data. We just signal the taskpane to trigger bake.
+    // For immediate visual feedback, we send a combined scene-update first.
+    async function requestBake() {
+      if (!channel) { log("No channel — open taskpane first.", "warn"); return; }
+      $btnBake.disabled = true;
+      $btnBake.textContent = "⏳ Baking…";
+      log("Requesting bake from taskpane…");
+      // Push our latest state to taskpane
+      await channel.publish(MSG.SCENE_UPDATE, {
+        tracks: tracks.map(t => ({ ...t }))
+      }, { target: "peer" }).catch(() => {});
+      // Signal bake
+      await channel.publish(MSG.BAKE_START, {}, { target: "peer" }).catch(() => {});
+    }
+
+    // ── Playhead tick ──────────────────────────────────────────────────────────
+    function updatePlayheads(t) {
+      playheadSeconds = t;
+      $trackRows.querySelectorAll("[data-ph]").forEach(ph => {
+        ph.style.left = secondsToPixels(t) + "px";
+      });
+    }
+
+    // ── Panel drag (move) ─────────────────────────────────────────────────────
+    (() => {
+      let pDrag = null;
+      const header = document.getElementById("panelHeader");
+      header.addEventListener("mousedown", e => {
+        if (e.target.tagName === "BUTTON") return;
+        e.preventDefault();
+        const rect = $panel.getBoundingClientRect();
+        pDrag = { startX: e.clientX, startY: e.clientY,
+                   origRight: window.innerWidth - rect.right,
+                   origBottom: window.innerHeight - rect.bottom };
+        document.addEventListener("mousemove", onPanelMove);
+        document.addEventListener("mouseup", onPanelUp);
+      });
+      const onPanelMove = e => {
+        if (!pDrag) return;
+        const dx = e.clientX - pDrag.startX;
+        const dy = e.clientY - pDrag.startY;
+        $panel.style.right  = Math.max(8, pDrag.origRight  - dx) + "px";
+        $panel.style.bottom = Math.max(8, pDrag.origBottom - dy) + "px";
+        window.yoAnimeOverlayInteraction?.reportBounds?.();
+      };
+      const onPanelUp = () => {
+        pDrag = null;
+        document.removeEventListener("mousemove", onPanelMove);
+        document.removeEventListener("mouseup", onPanelUp);
+        window.yoAnimeOverlayInteraction?.reportBounds?.();
+      };
+    })();
+
+    // ── Button wiring ──────────────────────────────────────────────────────────
+    $btnClose.addEventListener("click", async () => {
+      try { await yoanime.overlay.hide(); } catch (_) {}
+    });
+
+    $btnBake.addEventListener("click", requestBake);
+    $btnClear.addEventListener("click", () => {
+      tracks = [];
+      renderTracks();
+      log("Tracks cleared.", "warn");
+    });
+
+    $btnReapplyStagger.addEventListener("click", applyStagger);
+
+    // ── Handle messages from taskpane ─────────────────────────────────────────
+    function handleChannelEvent(event) {
+      const { event: type, payload } = event;
+      if (!type) return;
+
+      switch (type) {
+        case MSG.SCENE_UPDATE: {
+          if (payload && Array.isArray(payload.tracks)) {
+            tracks = payload.tracks.map(t => ({ ...t }));
+            renderTracks();
+            $overlayStatus.textContent = `${tracks.length} track(s)`;
+            $btnBake.disabled = tracks.length === 0;
+          }
+          break;
+        }
+        case MSG.SETTINGS_UPDATE: {
+          if (payload) {
+            if (typeof payload.stagger === "number") stagger = payload.stagger;
+            if (typeof payload.totalDuration === "number") totalDuration = payload.totalDuration;
+          }
+          break;
+        }
+        case MSG.BAKE_START: {
+          $btnBake.disabled = true;
+          $btnBake.textContent = "⏳ Baking…";
+          log("Baking sequence…");
+          break;
+        }
+        case MSG.BAKE_DONE: {
+          $btnBake.disabled = tracks.length === 0;
+          $btnBake.textContent = "▶ Bake & Play";
+          log(`Bake complete — ${(payload?.durationSeconds || 0).toFixed(2)}s total.`, "ok");
+          break;
+        }
+        case MSG.TRACK_REMOVED: {
+          if (payload?.runtimeNodeId) {
+            tracks = tracks.filter(t => t.runtimeNodeId !== payload.runtimeNodeId);
+            renderTracks();
+          }
+          break;
+        }
+      }
+    }
+
+    // ── Boot ───────────────────────────────────────────────────────────────────
+    async function boot() {
+      log("Waiting for SDK bridge…");
+      try {
+        await yoanime.runtime.ready();
+
+        // Init interactive overlay region
+        window.yoAnimeOverlayInteraction?.init({
+          containerId: "panel",
+          interactiveSelectors: ["#panel", "#panel *"]
+        });
+
+        // Report initial bounds
+        const reportBounds = () => {
+          window.yoAnimeOverlayInteraction?.reportBounds?.();
+          window.yoAnimeBridge?.sendBoundsToHost?.();
+        };
+        reportBounds();
+        [100, 300, 600, 1200].forEach(d => setTimeout(reportBounds, d));
+
+        // Open channel and subscribe to taskpane messages
+        channel = await yoanime.channels.open(CHANNEL_ID, {
+          label: "Shape Choreographer",
+          ownerExtensionId: "shape-choreographer"
+        });
+
+        channel.subscribe("*", handleChannelEvent);
+
+        // Playback tick → animate playhead
+        yoanime.timeline.onTick(tick => {
+          updatePlayheads(tick.timeSeconds || 0);
+        });
+
+        const onPlaybackStarted = () => { log("Playing…"); };
+        const onPlaybackStopped = () => {
+          updatePlayheads(0);
+          $btnBake.disabled = tracks.length === 0;
+          $btnBake.textContent = "▶ Bake & Play";
+          log("Playback stopped.", "ok");
+        };
+
+        if (yoanime.playback?.onStarted) {
+          yoanime.playback.onStarted(onPlaybackStarted);
+        } else {
+          yoanime.events?.on?.("playback.started", onPlaybackStarted);
+        }
+
+        if (yoanime.playback?.onStopped) {
+          yoanime.playback.onStopped(onPlaybackStopped);
+        } else {
+          yoanime.events?.on?.("playback.stopped", onPlaybackStopped);
+        }
+
+        $overlayStatus.textContent = "Connected";
+        log("Ready — waiting for taskpane to send tracks.", "ok");
+
+        // Request initial state from taskpane by pinging
+        await channel.publish("overlay:ready", {}, { target: "peer" }).catch(() => {});
+
+        // Update bounds on resize
+        window.addEventListener("resize", () => {
+          renderRuler();
+          renderTrackBars();
+          reportBounds();
+        });
+
+      } catch (err) {
+        $overlayStatus.textContent = "Error";
+        log("Boot error: " + (err.message || err), "error");
+        console.error("[ChoreographerOverlay] boot error:", err);
+      }
+    }
+
+    boot();
+  })();
+  </script>
+</body>
+</html>

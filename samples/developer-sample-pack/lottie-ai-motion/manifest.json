@@ -1,0 +1,27 @@
+{
+  "manifestVersion": 2,
+  "id": "sample.lottie-ai-motion",
+  "name": "Sample Lottie And AI Motion",
+  "version": "0.1.0",
+  "author": "yoAnime",
+  "description": "Demonstrates Lottie transform extraction and the vendor-neutral AI motion provider contract.",
+  "surface": "taskpane",
+  "taskPaneEntry": "taskpane.html",
+  "sdkVersionMin": "0.3.0",
+  "permissions": [
+    "selection.read",
+    "scene.read",
+    "timeline.write",
+    "timeline.playback"
+  ],
+  "capabilities": [
+    "taskpane.surface"
+  ],
+  "gallery": {
+    "category": "developer-sample",
+    "tags": ["lottie", "ai", "generated-motion-ir"],
+    "license": "MIT",
+    "channel": "stable",
+    "changelog": "Phase 103 developer sample."
+  }
+}
