@@ -95,3 +95,6 @@ Samples, templates, and documentation in this repository are MIT licensed unless
 
 The yoAnime Studio application/runtime is proprietary and is not included in this repository.
 
+## External AI Developer Validation
+
+We tested this public SDK repository by giving it to an external AI coding agent without private yoAnime source code. The agent generated installable yoAnime extensions that used the public manifest contract and JavaScript SDK to read PowerPoint selection and scene data and bake animations. The extensions installed through the yoAnime Extension Manager and worked through the public SDK.

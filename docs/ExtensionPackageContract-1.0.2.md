@@ -28,6 +28,10 @@ MyExtension/
   manifest.json
   taskpane.html
   overlay.html
+  js/
+    yoAnimeBridge.js
+  Runtime/
+    yoAnimeOverlayInteraction.js
   assets/
   scripts/
   styles/
@@ -318,3 +322,5 @@ docs/SdkSamples/1.0.2/extension-package-template/
 ```
 
 It is intentionally simple: one manifest, one taskpane, one overlay, and no build step.
+
+For two-surface packages, include the SDK bridge helper files from the public template unless your page is intentionally using a host-injected bridge. The template files provide window.yoanime plus overlay click-through/focus behavior and keep the package self-contained for local installation.

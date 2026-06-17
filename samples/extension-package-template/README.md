@@ -14,6 +14,7 @@ The template demonstrates:
 
 - one manifest
 - taskpane plus overlay pages
+- self-contained SDK bridge helper files
 - `runtime.ready()`
 - taskpane/overlay messaging
 - overlay click-through setup
@@ -21,3 +22,13 @@ The template demonstrates:
 
 Rename the manifest `id`, `name`, and UI text before publishing.
 
+## Keep These Files
+
+The pages reference these helper files and they should stay inside the package:
+
+```text
+js/yoAnimeBridge.js
+Runtime/yoAnimeOverlayInteraction.js
+```
+
+Do not omit them when generating or zipping a two-surface extension. They provide the public window.yoanime SDK facade and overlay click-through/focus behavior used by the sample pages.
