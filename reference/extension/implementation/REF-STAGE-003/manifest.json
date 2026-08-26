@@ -1,0 +1,34 @@
+{
+  "manifestVersion": 2,
+  "id": "yoanime-sdk-reference",
+  "name": "yoAnime SDK Reference Extension",
+  "version": "1.0.0",
+  "author": "yoAnime SDK Team",
+  "description": "Current SDK Reference Extension v1.0.0 baseline (v0.4.0 contract). Demonstrates Behavior, Relationship, Constraints, Articulation, Motion, Scene, Selection, Timeline, Playback, and Showcase capabilities. Full graph API surface (behavior.*, relationship.*, constraints.*, scene.roles.*) exposed.",
+  "surface": "overlay-taskpane",
+  "entry": "overlay.html",
+  "taskPaneEntry": "taskpane.html",
+  "sdkVersionMin": "0.4.0",
+  "permissions": [
+    "behavior.read",
+    "behavior.write",
+    "relationship.write",
+    "constraint.read",
+    "constraint.write",
+    "scene.read",
+    "scene.write",
+    "selection.read",
+    "geometry.read",
+    "timeline.read",
+    "timeline.write",
+    "timeline.playback",
+    "interaction.write",
+    "extensions.read",
+    "diagnostics.read"
+  ],
+  "capabilities": [
+    "taskpane.surface",
+    "overlay.surface",
+    "sdk.events"
+  ]
+}

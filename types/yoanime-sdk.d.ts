@@ -1,4 +1,4 @@
-/* yoAnime Studio Runtime SDK v0.3.0
+/* yoAnime Studio Runtime SDK v0.4.0
  * Public extension surface. Browser extensions send intents only; WPF/VSTO remain authoritative.
  */
 
@@ -87,6 +87,29 @@ export interface SelectedShape {
     height: number;
   };
   hasStableRuntimeIdentity: boolean;
+}
+
+/** Two-dimensional point in slide-point (PPT coordinate) or screen-DIP space. */
+export interface PointDto {
+  x: number;
+  y: number;
+}
+
+/**
+ * Normalized selection result returned by `selection.get()` and delivered to
+ * `selection.onChanged()`. Wraps the primary shape with selection metadata.
+ */
+export interface SelectionResult {
+  primary: SelectedShape | null;
+  shape: SelectedShape | null;
+  shapes: SelectedShape[];
+  count: number;
+  groupBounds?: {
+    left: number;
+    top: number;
+    width: number;
+    height: number;
+  };
 }
 
 export interface RuntimePropertyValue {
@@ -320,16 +343,23 @@ export type YoAnimeSdkEventName =
   | "selection.changed"
   | "selection.cleared"
   | "scene.updated"
+  | "scene.changed"
   | "timeline.updated"
   | "timeline.tick"
   | "channels.message"
+  | "channels.opened"
+  | "channels.closed"
+  | "constraints.changed"
+  | "behavior.changed"
   | "data.changed"
   | "webSurface.event"
   | "playback.started"
   | "playback.stopped"
   | "slideshow.started"
-  | "slideshow.slidechanged"
+  | "slideshow.slideChanged"
   | "slideshow.ended"
+  | "presets.changed"
+  | "motionproviders.changed"
   | "runtime.warning"
   | "runtime.sessionEnded";
 
@@ -490,6 +520,7 @@ export interface MotionProviderContext {
 
 export interface MotionProvider {
   id: string;
+  version?: string;
   name?: string;
   label?: string;
   kind?: MotionProviderKind | string;
@@ -938,6 +969,588 @@ export interface PhysicsGeneratedMotion extends TimelineBakeRequest {
   bakeResult?: any;
 }
 
+export interface TimelineBakeResult {
+  success: boolean;
+  error?: string;
+  label: string;
+  layerCount: number;
+  propertyTrackCount: number;
+  timeline?: TimelineSnapshot;
+  timelineOmitted?: boolean;
+  timelineOmitReason?: string;
+  timelineVersion: number;
+}
+
+export interface TimelineHistoryTransactionResult {
+  success: boolean;
+  error?: string;
+  operation?: string;
+  label?: string;
+  depth: number;
+  undoDepth: number;
+  redoDepth: number;
+  timeline?: TimelineSnapshot;
+  timelineVersion: number;
+}
+
+export interface TimelineHistoryResult {
+  success: boolean;
+  error?: string;
+  operation?: string;
+  timeline?: TimelineSnapshot;
+  timelineVersion: number;
+  undoDepth: number;
+  redoDepth: number;
+}
+
+export interface ShapeDescriptor {
+  id?: string;
+  logicalId?: string;
+  type?: string;
+  bounds?: {
+    left?: number;
+    x?: number;
+    top?: number;
+    y?: number;
+    width?: number;
+    height?: number;
+  };
+  from?: { x: number; y: number };
+  to?: { x: number; y: number };
+  rotation?: number;
+  visible?: boolean;
+  zIndex?: number;
+  name?: string;
+  fill?: { color: string };
+  outline?: { color: string; weight?: number };
+  text?: { content: string; fontSize?: number; color?: string };
+  tags?: string[];
+  metadata?: Record<string, string>;
+}
+
+export interface SceneBuildDescriptor {
+  clear?: boolean;
+  shapes: ShapeDescriptor[];
+}
+
+export interface ShapeCreateResult {
+  id: string;
+  runtimeNodeId: string;
+  name: string;
+  powerPointShapeId: string;
+}
+
+export interface SdkSceneBuildResult {
+  success: boolean;
+  shapes: ShapeCreateResult[];
+  error?: string;
+}
+
+export interface RolesSetOptions {
+  roles?: string[];
+  tags?: string[];
+  metadata?: Record<string, string>;
+}
+
+export interface RolesSetResult {
+  success: boolean;
+  runtimeNodeId: string;
+  roles: string[];
+  tags: string[];
+  metadata: Record<string, string>;
+  transactionId: string;
+  error?: string;
+}
+
+/**
+ * Closed V1 constraint taxonomy (F3.1; contract §4). The union is closed at the four V1
+ * types; Spring and deferred types are absent from the V1 surface.
+ */
+export type ConstraintType =
+  | "Follow"
+  | "MaintainDistance"
+  | "LookAt"
+  | "MaintainOffset";
+
+/** Per-type parameter set carried by create/update/read (F2.5; contract §4). Fields irrelevant to a type are simply not used. */
+export interface ConstraintParameters {
+  /** Offset applied to the source along X (Follow, MaintainOffset). */
+  offsetX?: number;
+  /** Offset applied to the source along Y (Follow, MaintainOffset). */
+  offsetY?: number;
+  /** Rotation offset in degrees (Follow, MaintainOffset). */
+  offsetRotation?: number;
+  /** If true, the target keeps its own rotation instead of adopting the source's (Follow). */
+  maintainRotation?: boolean;
+  /** Fixed distance from the source (MaintainDistance); must be >= 0. */
+  distance?: number;
+}
+
+/** Full serialized view of one definition (F2.1–F2.6; contract §4). Never carries order index as truth or derived/evaluation state. */
+export interface ConstraintDto {
+  constraintId: string;
+  type: ConstraintType;
+  sourceId: string;
+  targetId: string;
+  parameters: ConstraintParameters;
+  enabled: boolean;
+}
+
+/** List-view row of one definition (contract §4). Order is conveyed by list position (I6), not an embedded truth field. */
+export interface ConstraintSummary {
+  constraintId: string;
+  type: ConstraintType;
+  sourceId: string;
+  targetId: string;
+  enabled: boolean;
+}
+
+/** The list() read projection: the ordered set of definitions for the current scene. Never null; empty array when no graph (lazy, RI-10). */
+export interface ConstraintListResponse {
+  constraints: ConstraintSummary[];
+}
+
+/** The get(id) read projection: the full definition view, or an explicit not-found verdict (null) when the identity is absent or retired. */
+export interface ConstraintGetResponse {
+  constraint: ConstraintDto | null;
+}
+
+/** The create proposal (intent). No identity field — identity is host-minted (Truth Model §10). */
+export interface ConstraintCreateInput {
+  type: ConstraintType;
+  sourceId: string;
+  targetId: string;
+  parameters?: ConstraintParameters;
+  space?: "local" | "world";
+  enabled?: boolean;
+}
+
+/** The host verdict for a create: the accepted definition (host-minted canonical identity). */
+export interface ConstraintCreateResponse {
+  constraint: ConstraintDto;
+}
+
+/** The change patch (intent). Carries the target identity plus changeable facts; identity is never altered by a patch (M3). */
+export interface ConstraintUpdateInput {
+  constraintId: string;
+  parameters?: ConstraintParameters;
+  enabled?: boolean;
+  sourceId?: string;
+  targetId?: string;
+  space?: "local" | "world";
+}
+
+/** The host verdict for an update: the resulting definition. */
+export interface ConstraintUpdateResponse {
+  constraint: ConstraintDto;
+}
+
+/** The host verdict for a remove: removal acknowledged with the retired identity (CS-T3). */
+export interface ConstraintRemoveResponse {
+  constraintId: string;
+}
+
+/** Graph-changed notification payload: what changed and which identity (contract §4, §9). Notification only; never carries solved output (I8). */
+export interface ConstraintChangedEvent {
+  sceneId: string;
+  operation: "create" | "update" | "remove" | "reorder" | "enable" | "disable";
+  constraintId: string;
+}
+
+/**
+ * Closed V1 Behavior taxonomy (frozen M3-A contract §3; F3.1). The union is closed at the six
+ * V1 behaviors; deferred types are absent from the V1 surface.
+ */
+export type BehaviorType =
+  | "Patrol"
+  | "FollowTarget"
+  | "Wander"
+  | "Guard"
+  | "Evade"
+  | "Idle";
+
+/** Per-type parameter set carried by read (BehaviorParameters F2.4; M5-A contract §5/§6). Fields irrelevant to a type are simply not used. Carries only declarative intent data. */
+export interface BehaviorParameters {
+  /** Target/threat/anchor entity (borrowed canonical scene identity) — FollowTarget, Guard, Evade. */
+  targetEntityId?: string;
+  /** Declarative radius/range/bounds value — Wander (bounds), Guard (alert radius), Evade (threat range). */
+  radius?: number;
+  /** Ordered patrol waypoint identities (borrowed canonical scene identities) — Patrol. */
+  patrolPoints?: string[];
+}
+
+/** List-view row of one definition (M5-A contract §6). Contains only authoritative graph information necessary for enumeration. Order is conveyed by list position, not an embedded truth field. */
+export interface BehaviorSummary {
+  behaviorId: string;
+  behaviorType: BehaviorType;
+  enabled: boolean;
+  attachedEntityId: string;
+}
+
+/** Full serialized view of one definition (M5-A contract §5/§6). Never carries derived facts (intent/state/transitions/evaluation order/activation plan) — authoritative graph truth only. */
+export interface BehaviorDefinitionDto {
+  behaviorId: string;
+  behaviorType: BehaviorType;
+  attachedEntityId: string;
+  parameters: BehaviorParameters;
+  enabled: boolean;
+}
+
+/** The list() read projection: the ordered Behavior membership for a scene. Never null; empty array when the scene has no graph (lazy, M5-A contract §11). Never fabricates a graph on read. */
+export interface BehaviorListResponse {
+  behaviors: BehaviorSummary[];
+}
+
+/** The get(id) read projection: the full definition view including authoritative parameters. Missing/invalid identity is a not-found SDK error (M5-A contract §11/§12). */
+export interface BehaviorGetResponse {
+  behavior: BehaviorDefinitionDto;
+}
+
+/** The create proposal (intent; M5-A contract §7/§8). No identity field — the BehaviorId is host-minted by the authority (Truth Model §10). `attachedEntityId` is a borrowed canonical scene identity. */
+export interface BehaviorCreateInput {
+  behaviorType: BehaviorType;
+  attachedEntityId: string;
+  parameters?: BehaviorParameters;
+  enabled?: boolean;
+}
+
+/** The host verdict for a create: the accepted definition carrying the host-minted canonical identity. */
+export interface BehaviorCreateResponse {
+  behavior: BehaviorDefinitionDto;
+}
+
+/** The change patch (intent; M5-A contract §7/§10). Carries the target identity plus changeable facts only — BehaviorType and AttachedEntityId are immutable in the authority's update path. */
+export interface BehaviorUpdateInput {
+  behaviorId: string;
+  parameters?: BehaviorParameters;
+  enabled?: boolean;
+}
+
+/** The host verdict for an update: the resulting definition after the authority applied the patch. */
+export interface BehaviorUpdateResponse {
+  behavior: BehaviorDefinitionDto;
+}
+
+/** The host verdict for a remove: removal acknowledged with the retired identity (Truth Model §10). */
+export interface BehaviorRemoveResponse {
+  behaviorId: string;
+}
+
+/** The reorder proposal (M5-A contract §7/§8). Scene Behavior Graph membership order only — never evaluation order, transition priority, runtime scheduling, or constraint/procedural ordering. */
+export interface BehaviorReorderInput {
+  behaviorId: string;
+  newIndex: number;
+}
+
+/** The host verdict for a reorder: the resulting definition at its new membership position. */
+export interface BehaviorReorderResponse {
+  behavior: BehaviorDefinitionDto;
+}
+
+/** The setEnabled proposal (M5-A contract §7/§13). Enabled is authoritative graph definition state; runtime consequences are the Behavior evaluation/runtime layers' responsibility. */
+export interface BehaviorSetEnabledInput {
+  behaviorId: string;
+  enabled: boolean;
+}
+
+/** The host verdict for setEnabled: the resulting definition with the authoritative enabled state. */
+export interface BehaviorSetEnabledResponse {
+  behavior: BehaviorDefinitionDto;
+}
+
+/** Behavior graph-changed notification payload (M5-A contract §9; RD-2). Notification only — scene identity + targeted behavior identity; never the graph snapshot, definitions, derived intent/state, or activation plans (BI-8). */
+export interface BehaviorChangedEvent {
+  sceneId: string;
+  behaviorId?: string;
+}
+
+// ── Relationship surface (Mission 5B additive): typed projection of the existing gateway routes ──
+// Gateway reference: SdkCommandGateway.cs relationship routes L669-688, handlers L2944-3188,
+// permission relationship.write L1207-1208. All 7 routes require relationship.write; no separate
+// read permission exists. Additive-only; no existing declaration modified.
+
+/** The Relationship type taxonomy. Closed at the single V1 Follow type (yoAnime.Engine.Relationships.DataModel.RelationshipType). */
+export type RelationshipType = "Follow";
+
+/** Declarative Follow relationship parameters. Offsets are world-space and applied as pure translation (Mission #5 pinned semantics — no pivot/rotation transform of offsets; no cos/sin). */
+export interface RelationshipParameters {
+  /** World-space X offset applied to the leader's X (follower.X = leader.X + OffsetX). */
+  offsetX: number;
+  /** World-space Y offset applied to the leader's Y (follower.Y = leader.Y + OffsetY). */
+  offsetY: number;
+  /** Rotation offset in degrees; when set, adds onto the leader's rotation (rotation inheritance per maintainRotation). */
+  offsetRotation?: number;
+  /** If true, the follower keeps its own rotation instead of adopting the leader's. */
+  maintainRotation: boolean;
+}
+
+/** Full serialized view of one definition (list DTO). Never carries derived/evaluation state. */
+export interface RelationshipDefinitionDto {
+  relationshipId: string;
+  leaderId: string;
+  followerId: string;
+  type: RelationshipType;
+  offsetX: number;
+  offsetY: number;
+  offsetRotation?: number;
+  maintainRotation: boolean;
+}
+
+/** The create proposal (intent). No identity field — relationshipId is host-minted. */
+export interface RelationshipCreateInput {
+  leaderId: string;
+  followerId: string;
+  offsetX?: number;
+  offsetY?: number;
+  offsetRotation?: number;
+  maintainRotation?: boolean;
+}
+
+/** The host verdict for a create: the accepted definition (host-minted canonical identity). */
+export interface RelationshipCreateResponse {
+  relationshipId: string;
+  success: boolean;
+}
+
+/** The change patch (intent). Carries the target identity plus changeable parameters only; identity/leader/follower/type are immutable in the host update path. */
+export interface RelationshipUpdateInput {
+  relationshipId: string;
+  offsetX?: number;
+  offsetY?: number;
+  offsetRotation?: number;
+  maintainRotation?: boolean;
+}
+
+/** The host verdict for an update. */
+export interface RelationshipUpdateResponse {
+  relationshipId: string;
+  success: boolean;
+}
+
+/** The removal proposal. */
+export interface RelationshipDeleteInput {
+  relationshipId: string;
+}
+
+/** The host verdict for a remove: removal acknowledged with the removed identity. */
+export interface RelationshipDeleteResponse {
+  relationshipId: string;
+  removed: boolean;
+  success: boolean;
+}
+
+/** The list() read projection: the set of definitions for the current scene. Never null; empty array when empty. */
+export interface RelationshipListResponse {
+  relationships: RelationshipDefinitionDto[];
+  success: boolean;
+}
+
+/** One element of a setAll replacement list. Identities are host-minted. */
+export interface RelationshipSetAllItem {
+  leaderId: string;
+  followerId: string;
+  offsetX?: number;
+  offsetY?: number;
+  offsetRotation?: number;
+  maintainRotation?: boolean;
+}
+
+/** The setAll proposal: replaces the full relationship set for the current scene. */
+export interface RelationshipSetAllInput {
+  relationships: RelationshipSetAllItem[];
+}
+
+/** The host verdict for a setAll: the number of applied definitions. */
+export interface RelationshipSetAllResponse {
+  count: number;
+  success: boolean;
+}
+
+/** The select proposal (inspector selection state for the current surface). Null/empty relationshipId clears the selection. */
+export interface RelationshipSelectInput {
+  relationshipId?: string;
+}
+
+/** The host verdict for select: echoes the recorded selection (null when cleared). */
+export interface RelationshipSelectResponse {
+  relationshipId?: string;
+  success: boolean;
+}
+
+/** One cached scene-node position entry returned by getPositions (keyed by runtime node id). */
+export interface RelationshipNodePosition {
+  left: number;
+  top: number;
+  width: number;
+  height: number;
+}
+
+/** The getPositions() read projection: the relationship set plus cached scene-node positions. */
+export interface RelationshipGetPositionsResponse {
+  relationships: Array<{
+    relationshipId: string;
+    leaderId: string;
+    followerId: string;
+    type: RelationshipType;
+    offsetX: number;
+    offsetY: number;
+  }>;
+  positions: Record<string, RelationshipNodePosition>;
+  success: boolean;
+}
+
+// ── Motion contract surface (Mission #3 additive): ik / expressions / transforms / commands ──
+// Facade reference: YoAnimeSdkProvider.cs (ik L3189-3346, expressions L3348-3538,
+// transforms L2805-2821, commands L5586-5619). Additive-only; no existing declaration modified.
+
+/** Options for ik.solveTwoBone. All angles are degrees; the solver is pure deterministic math (no host request). */
+export interface IkSolveTwoBoneOptions {
+  upperArmLength?: number;
+  forearmLength?: number;
+  targetX?: number;
+  targetY?: number;
+  shoulderX?: number;
+  shoulderY?: number;
+  elbowBendDirection?: number;
+  shoulderAngleOffset?: number;
+}
+
+/** Result of ik.solveTwoBone. Angles are reported in degrees. */
+export interface IkSolveTwoBoneResult {
+  shoulderAngle: number;
+  elbowAngle: number;
+  shoulderX: number;
+  shoulderY: number;
+  elbowX: number;
+  elbowY: number;
+  effectorX: number;
+  effectorY: number;
+}
+
+/** Options for ik.solveChain (FABRIK). */
+export interface IkSolveChainOptions {
+  boneLengths?: number[];
+  targetX?: number;
+  targetY?: number;
+  originX?: number;
+  originY?: number;
+  maxIterations?: number;
+  tolerance?: number;
+}
+
+/** One bone in an ik.solveChain result. angle is in degrees. */
+export interface IkSolveChainBone {
+  length: number;
+  angle: number;
+}
+
+/** Result of ik.solveChain (FABRIK). */
+export interface IkSolveChainResult {
+  bones: IkSolveChainBone[];
+  effectorX: number;
+  effectorY: number;
+}
+
+/** Options for ik.generateTwoBone. source (shoulder) and joint (elbow) shapes are required. */
+export interface IkGenerateTwoBoneOptions {
+  source: { runtimeNodeId?: string; nodeId?: string };
+  joint: { runtimeNodeId?: string; nodeId?: string };
+  durationSeconds?: number;
+  target?: { x: number; y: number };
+  targetX?: number;
+  targetY?: number;
+  forearmLength?: number;
+  elbowBendDirection?: number;
+  samples?: number;
+  sampleCount?: number;
+  startRotation?: number;
+  label?: string;
+}
+
+/** Result of ik.generateTwoBone — a two-rotation-layer generated-motion IR (clear: ['Rotation']). */
+export interface IkGenerateTwoBoneResult extends Omit<GeneratedMotionIr, "diagnostics"> {
+  diagnostics: {
+    upperArmLength: number;
+    sampleCount: number;
+    targetX: number;
+    targetY: number;
+  };
+}
+
+/** Expression evaluation context passed to expressions.evaluate and _eval: time/value/index/vars. */
+export interface ExpressionContext {
+  time?: number;
+  value?: number;
+  index?: number;
+  vars?: Record<string, number>;
+}
+
+/** Options for expressions.evaluate. */
+export interface ExpressionEvaluateOptions {
+  time?: number;
+  value?: number;
+  index?: number;
+  vars?: Record<string, number>;
+}
+
+/** Options for expressions.generateFromExpression. */
+export interface ExpressionGenerateOptions {
+  expression?: string;
+  propertyKind?: string;
+  durationSeconds?: number;
+  samples?: number;
+  sampleCount?: number;
+  runtimeNodeId?: string;
+  source?: { runtimeNodeId?: string; nodeId?: string };
+  additive?: boolean;
+  baseValue?: number;
+  value?: number;
+  easingFunction?: string;
+  label?: string;
+  vars?: Record<string, number>;
+}
+
+/** Result of expressions.generateFromExpression — a single-track generated-motion IR. */
+export interface ExpressionGenerateResult extends Omit<GeneratedMotionIr, "diagnostics"> {
+  diagnostics: {
+    expression: string;
+    propertyKind: string;
+    sampleCount: number;
+    additive: boolean;
+  };
+}
+
+/** Options shared by transforms.previewRotation / transforms.commitRotation (fire-and-forget, void). */
+export interface TransformRotationOptions {
+  angle: number;
+  finalAngle: number;
+  relativePivotX?: number;
+  relativePivotY?: number;
+}
+
+/** Options for commands.rotate (fire-and-forget, void). */
+export interface CommandRotateOptions {
+  angle: number;
+}
+
+/** Options for commands.translate (fire-and-forget, void). CAVEAT: no host gateway route — the message is a silent no-op (unhandled). */
+export interface CommandTranslateOptions {
+  offsetX: number;
+  offsetY: number;
+}
+
+/** Options for commands.scale (fire-and-forget, void). CAVEAT: no host gateway route — the message is a silent no-op (unhandled). */
+export interface CommandScaleOptions {
+  scaleX: number;
+  scaleY: number;
+}
+
+/** Options for commands.setPivot (fire-and-forget, void). */
+export interface CommandSetPivotOptions {
+  relativeX: number;
+  relativeY: number;
+}
+
 export interface YoAnimeSdk {
   version: string;
   /** @internal Debug convenience for local development. */
@@ -961,8 +1574,8 @@ export interface YoAnimeSdk {
   };
   /** @stable Current PowerPoint selection and selection lifecycle. Requires selection.read. */
   selection: {
-    get(): Promise<SelectedShape | null>;
-    onChanged(callback: (shape: SelectedShape) => void): () => void;
+    get(): Promise<SelectionResult | null>;
+    onChanged(callback: (result: SelectionResult) => void): () => void;
     onCleared(callback: () => void): () => void;
   };
   /** @preview Direct shape mutation helpers. Prefer scene roles and timeline.bake for public examples. */
@@ -995,6 +1608,8 @@ export interface YoAnimeSdk {
     get(knownVersion?: number): Promise<any>;
     /** @stable Requires scene.read. */
     get(options: { knownVersion?: number; includeGeometry?: boolean; includeShapeType?: boolean; includeTags?: boolean }): Promise<any>;
+    /** @preview Requires scene.write. */
+    build(descriptor: SceneBuildDescriptor): Promise<SdkSceneBuildResult>;
     /** @stable Requires scene.read. */
     query(query?: SceneQuery | string, options?: SceneQueryOptions): Promise<SceneQueryResult>;
     /** @stable Requires scene.read. */
@@ -1009,6 +1624,10 @@ export interface YoAnimeSdk {
     group(nodeIds: string[]): Promise<any>;
     /** @preview Requires scene.write. */
     ungroup(groupId: string): Promise<any>;
+    /** @preview Requires scene.write. */
+    roles: {
+      set(runtimeNodeId: string, rolesOrOptions: string[] | RolesSetOptions): Promise<RolesSetResult>;
+    };
     /** @stable Requires scene.read. */
     onUpdated(callback: (scene: any) => void): () => void;
   };
@@ -1020,8 +1639,8 @@ export interface YoAnimeSdk {
     play(options?: { startTimeSeconds?: number; time?: number }): void;
     /** @stable Requires timeline.playback. */
     stop(): void;
-    /** @stable Requires timeline.playback. */
-    scrub(timeSeconds: number): Promise<void>;
+    /** @stable Requires timeline.playback. Alias: scrub(). */
+    scrubTo(timeSeconds: number): Promise<void>;
     /** @stable Requires timeline.playback. */
     scrubBegin(timeSeconds?: number): Promise<void>;
     /** @stable Requires timeline.playback. */
@@ -1032,6 +1651,8 @@ export interface YoAnimeSdk {
     updateClip(clipId: string, options: { duration?: number; delay?: number; easing?: string }): Promise<void>;
     /** @preview Direct property-track editing API. */
     createTrack(request: RuntimePropertyTrack): Promise<PropertyTrackMutationResult>;
+    /** @stable Requires timeline.write. */
+    bake(request?: TimelineBakeRequest): Promise<TimelineBakeResult>;
     /** @preview Direct keyframe editing API. */
     addKeyframe(request: {
       runtimeNodeId: string;
@@ -1081,6 +1702,10 @@ export interface YoAnimeSdk {
     /** @internal Raw timeline import is not a public live scripting path. */
     import(timeline: TimelineSnapshot, options?: { slot?: string; save?: boolean }): Promise<{ success: boolean; slot?: string; path?: string; timelineVersion?: string | number; error?: string; timeline?: TimelineSnapshot }>;
     /** @preview Direct timeline editor API. */
+    undo(): Promise<TimelineHistoryResult>;
+    /** @preview Direct timeline editor API. */
+    redo(): Promise<TimelineHistoryResult>;
+    /** @preview Direct timeline editor API. */
     rebaseTrack(request: { runtimeNodeId: string }): Promise<PropertyTrackMutationResult>;
     /** @preview Timeline layer editor API. */
     setLayerState(request: TimelineLayerStateRequest): Promise<TimelineLayerStateResult>;
@@ -1102,6 +1727,8 @@ export interface YoAnimeSdk {
     registerPresetPack(pack: TimelinePresetPack): Promise<{ success: boolean; packId?: string; presetCount?: number; error?: string; errors?: TimelinePresetValidationError[] }>;
     /** @preview Preset registration API. */
     unregisterPresetPack(packId: string): Promise<{ success: boolean; packId: string }>;
+    /** @preview Preset registration API. */
+    unregisterPresetPacksByOwner(ownerExtensionId: string): Promise<{ success: boolean; ownerExtensionId: string; removedPackIds: string[] }>;
     /** @preview Preset application API. */
     applyPreset(preset: TimelinePreset | string): Promise<TimelinePresetResult>;
     /** @stable Requires timeline.playback. */
@@ -1123,6 +1750,12 @@ export interface YoAnimeSdk {
       deleteKeyframe(request: { runtimeNodeId: string; propertyTrackId: string; normalizedTime: number }): Promise<PropertyTrackMutationResult>;
       beginEdit(request?: { runtimeNodeId?: string; propertyTrackId?: string; reason?: string }): Promise<any>;
       endEdit(request?: { runtimeNodeId?: string; propertyTrackId?: string; reason?: string }): Promise<any>;
+    };
+    /** @preview History transaction management. */
+    history: {
+      begin(options?: { label?: string }): Promise<TimelineHistoryTransactionResult>;
+      commit(): Promise<TimelineHistoryTransactionResult>;
+      rollback(): Promise<TimelineHistoryTransactionResult>;
     };
     /** @stable Requires timeline.read. */
     onUpdated(callback: (timeline: any) => void): () => void;
@@ -1222,6 +1855,54 @@ export interface YoAnimeSdk {
     generateFollow(options?: Record<string, any>): Promise<TimelineBakeRequest>;
     generateLookAt(options?: Record<string, any>): Promise<TimelineBakeRequest>;
     generateMaintainDistance(options?: Record<string, any>): Promise<TimelineBakeRequest>;
+    /** @stable Read projection of the current scene's Constraint Graph. Requires constraint.read. */
+    list(): Promise<ConstraintListResponse>;
+    /** @stable Read projection of a single definition by its canonical identity. Requires constraint.read. */
+    get(constraintId: string): Promise<ConstraintGetResponse>;
+    /** @stable Proposes a new definition; the host validates and applies atomically. Requires constraint.write. */
+    create(input: ConstraintCreateInput): Promise<ConstraintCreateResponse>;
+    /** @stable Proposes a change to an existing definition; the host validates and applies atomically. Requires constraint.write. */
+    update(constraintId: string, patch: ConstraintUpdateInput): Promise<ConstraintUpdateResponse>;
+    /** @stable Proposes removal of a definition from the graph. Requires constraint.write. */
+    remove(constraintId: string): Promise<ConstraintRemoveResponse>;
+    /** @stable Subscribes to graph-change notifications; returns an unsubscribe function. Requires constraint.read. */
+    onChanged(callback: (event: ConstraintChangedEvent) => void): () => void;
+  };
+  /** @stable Read projection + write projection of the current scene's Behavior Graph. Reads require behavior.read; writes require behavior.write. */
+  behavior: {
+    /** @stable Ordered Behavior membership for the current scene. Requires behavior.read. */
+    list(): Promise<BehaviorListResponse>;
+    /** @stable Full definition of one behavior by its canonical identity. Missing identity → not-found error. Requires behavior.read. */
+    get(behaviorId: string): Promise<BehaviorGetResponse>;
+    /** @stable Proposes a new definition; the host mints the canonical identity and applies atomically. Requires behavior.write. */
+    create(input: BehaviorCreateInput): Promise<BehaviorCreateResponse>;
+    /** @stable Proposes a change to an existing definition (parameters/enabled only); the host validates and applies atomically. Requires behavior.write. */
+    update(behaviorId: string, patch: BehaviorUpdateInput): Promise<BehaviorUpdateResponse>;
+    /** @stable Proposes removal of a definition from the graph; the host retires the identity. Requires behavior.write. */
+    remove(behaviorId: string): Promise<BehaviorRemoveResponse>;
+    /** @stable Proposes a membership-order change; the host applies atomically. Requires behavior.write. */
+    reorder(behaviorId: string, newIndex: number): Promise<BehaviorReorderResponse>;
+    /** @stable Proposes an authoritative enabled toggle; the host validates and applies atomically. Requires behavior.write. */
+    setEnabled(behaviorId: string, enabled: boolean): Promise<BehaviorSetEnabledResponse>;
+    /** @stable Subscribes to behavior graph-change notifications (raw { sceneId, behaviorId } payload); returns an unsubscribe function. Requires behavior.read. */
+    onChanged(callback: (event: BehaviorChangedEvent) => void): () => void;
+  };
+  /** @stable Read/write projection of the current scene's Relationship Graph. All 7 routes require relationship.write at the host (SdkCommandGateway.cs:1207-1208); no separate read permission exists. Additive Mission 5B contract exposure; underlying Follow semantics and runtime execution are unchanged. */
+  relationship: {
+    /** @stable Proposes a new Follow definition; the host mints the canonical identity. Requires relationship.write. */
+    create(input: RelationshipCreateInput): Promise<RelationshipCreateResponse>;
+    /** @stable Proposes a parameter change to an existing definition; identity/leader/follower/type are immutable in the host update path. Requires relationship.write. */
+    update(input: RelationshipUpdateInput): Promise<RelationshipUpdateResponse>;
+    /** @stable Proposes removal of a definition from the graph. Requires relationship.write. */
+    delete(input: RelationshipDeleteInput): Promise<RelationshipDeleteResponse>;
+    /** @stable Lists the Follow definitions of the current scene. Requires relationship.write. */
+    list(): Promise<RelationshipListResponse>;
+    /** @stable Replaces the full relationship set for the current scene; the host mints identities. Requires relationship.write. */
+    setAll(input: RelationshipSetAllInput): Promise<RelationshipSetAllResponse>;
+    /** @stable Records the inspector selection for the current surface; null/empty relationshipId clears it. Requires relationship.write. */
+    select(input: RelationshipSelectInput): Promise<RelationshipSelectResponse>;
+    /** @stable Read projection of the relationship set plus cached scene-node positions. Requires relationship.write. */
+    getPositions(): Promise<RelationshipGetPositionsResponse>;
   };
   /** @stable Pure SVG/path sampling helpers and path motion generation helpers. */
   paths: {
@@ -1340,10 +2021,10 @@ export interface YoAnimeSdk {
   };
   /** @stable Projection helpers. Requires geometry.read. */
   geometry: {
-    screenToSlide(screenX: number, screenY: number): Promise<any>;
-    screenToSlide(point: { x: number; y: number } | { X: number; Y: number }): Promise<any>;
-    slideToScreen(slideX: number, slideY: number): Promise<any>;
-    slideToScreen(point: { x: number; y: number } | { X: number; Y: number }): Promise<any>;
+    screenToSlide(screenX: number, screenY: number): Promise<PointDto>;
+    screenToSlide(point: { x: number; y: number } | { X: number; Y: number }): Promise<PointDto>;
+    slideToScreen(slideX: number, slideY: number): Promise<PointDto>;
+    slideToScreen(point: { x: number; y: number } | { X: number; Y: number }): Promise<PointDto>;
   };
   /** @stable Overlay visibility, interactivity, and surface messaging. */
   overlay: {
@@ -1353,12 +2034,12 @@ export interface YoAnimeSdk {
     getState(): Promise<OverlayState>;
     setInteractive(isInteractive: boolean): Promise<{ success: boolean }>;
     postMessage<TMessage = unknown>(message: TMessage): Promise<SurfacePostMessageResult>;
-    onMessage<TMessage = unknown>(callback: (event: SurfaceMessage<TMessage>) => void): () => void;
+    onMessage<TMessage = unknown>(callback: (message: TMessage) => void): () => void;
   };
   /** @stable Taskpane surface messaging. */
   taskpane: {
     postMessage<TMessage = unknown>(message: TMessage): Promise<SurfacePostMessageResult>;
-    onMessage<TMessage = unknown>(callback: (event: SurfaceMessage<TMessage>) => void): () => void;
+    onMessage<TMessage = unknown>(callback: (message: TMessage) => void): () => void;
   };
   /** @stable JSON-safe runtime channels for taskpane/overlay coordination. */
   channels: {
@@ -1417,6 +2098,44 @@ export interface YoAnimeSdk {
     unmount(extensionId: string): Promise<ExtensionToggleResult>;
     /** @internal Requires extensions.write; ordinary extensions should not toggle other extensions. */
     toggle(extensionId: string, enable: boolean): Promise<ExtensionToggleResult>;
+  };
+  /** @stable Pure inverse-kinematics helpers. @preview FABRIK chain solver. */
+  ik: {
+    /** @stable Two-bone IK solver; angles returned in degrees. Pure deterministic math (no host request). Transitively certified through the built-in yoanime.ik.two-bone-chain provider (Mission #2 Stage A). */
+    solveTwoBone(options?: IkSolveTwoBoneOptions): IkSolveTwoBoneResult;
+    /** @preview FABRIK multi-bone chain solver; angles in degrees. Presence-only — no built-in consumer yet. */
+    solveChain(options?: IkSolveChainOptions): IkSolveChainResult;
+    /** @stable Generates a two-rotation-layer timeline IR from source (shoulder) and joint (elbow) shapes. Requires source/joint with runtimeNodeId. */
+    generateTwoBone(options?: IkGenerateTwoBoneOptions): Promise<IkGenerateTwoBoneResult>;
+  };
+  /** @stable Expression parser/evaluator/generator surface. @internal _parse/_eval are declared for parity only. */
+  expressions: {
+    /** @internal Recursive-descent expression parser (implementation detail). */
+    _parse(expression: string): any;
+    /** @internal Expression AST evaluator (implementation detail). Unknown calls evaluate to 0. */
+    _eval(ast: any, ctx: ExpressionContext): number;
+    /** @preview Synchronously evaluates an expression against a context. Presence-only — no built-in consumer yet. */
+    evaluate(expression: string, options?: ExpressionEvaluateOptions): number;
+    /** @stable Generates a single-track timeline IR from an expression (additive by default). Requires a source shape with runtimeNodeId. Direct dependency of the five certified yoanime.expression.* providers (Mission #2 Stage A). */
+    generateFromExpression(options?: ExpressionGenerateOptions): Promise<ExpressionGenerateResult>;
+  };
+  /** @preview Rotation preview/commit host commands. Fire-and-forget (void, no response). Requires shapes.write at the host (gateway route + permission map L1172-1174). */
+  transforms: {
+    /** @preview Previews a rotation on the WPF ghost overlay (fire-and-forget; no response). */
+    previewRotation(angle: number, relativePivotX?: number, relativePivotY?: number): void;
+    /** @preview Commits a rotation to the live PowerPoint shape over the pipe (fire-and-forget; no response). */
+    commitRotation(finalAngle: number, relativePivotX?: number, relativePivotY?: number): void;
+  };
+  /** @preview Imperative shape commands. Fire-and-forget (void, no response). Requires shapes.write at the host (permission map L1172-1174). */
+  commands: {
+    /** @preview Rotates the selected shape (fire-and-forget). */
+    rotate(angle: number): void;
+    /** @preview Translates the selected shape. CAVEAT: no host gateway route exists — the message is a silent no-op (unhandled). */
+    translate(offsetX: number, offsetY: number): void;
+    /** @preview Scales the selected shape. CAVEAT: no host gateway route exists — the message is a silent no-op (unhandled). */
+    scale(scaleX: number, scaleY: number): void;
+    /** @preview Sets the custom rotation pivot on the selected shape (fire-and-forget). */
+    setPivot(relativeX: number, relativeY: number): void;
   };
 }
 
