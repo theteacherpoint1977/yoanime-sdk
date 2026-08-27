@@ -360,6 +360,8 @@ export type YoAnimeSdkEventName =
   | "slideshow.ended"
   | "presets.changed"
   | "motionproviders.changed"
+  | "transforms.changed"
+  | "commands.changed"
   | "runtime.warning"
   | "runtime.sessionEnded";
 
@@ -1157,6 +1159,29 @@ export interface ConstraintChangedEvent {
   constraintId: string;
 }
 
+/** Transform change notification (ARC-006). Fires after a successful transforms preview/commit. Fire-and-forget host mutation; payload is the original command params plus timestamp. */
+export interface TransformChangedEvent {
+  operation: "previewRotation" | "commitRotation";
+  angle?: number;
+  finalAngle?: number;
+  relativePivotX?: number;
+  relativePivotY?: number;
+  timestamp: number;
+}
+
+/** Command change notification (ARC-006). Fires after a successful commands rotate/translate/scale/setPivot. Payload mirrors the original command params plus timestamp. */
+export interface CommandChangedEvent {
+  operation: "rotate" | "translate" | "scale" | "setPivot";
+  angle?: number;
+  offsetX?: number;
+  offsetY?: number;
+  scaleX?: number;
+  scaleY?: number;
+  relativeX?: number;
+  relativeY?: number;
+  timestamp: number;
+}
+
 /**
  * Closed V1 Behavior taxonomy (frozen M3-A contract §3; F3.1). The union is closed at the six
  * V1 behaviors; deferred types are absent from the V1 surface.
@@ -1533,13 +1558,13 @@ export interface CommandRotateOptions {
   angle: number;
 }
 
-/** Options for commands.translate (fire-and-forget, void). CAVEAT: no host gateway route — the message is a silent no-op (unhandled). */
+/** Options for commands.translate (fire-and-forget, void). Requires shapes.write at the host. */
 export interface CommandTranslateOptions {
   offsetX: number;
   offsetY: number;
 }
 
-/** Options for commands.scale (fire-and-forget, void). CAVEAT: no host gateway route — the message is a silent no-op (unhandled). */
+/** Options for commands.scale (fire-and-forget, void). Requires shapes.write at the host. */
 export interface CommandScaleOptions {
   scaleX: number;
   scaleY: number;
@@ -1940,8 +1965,9 @@ export interface YoAnimeSdk {
     normalizeAnimatedValues(property: any, options?: { frameRate?: number; inPoint?: number; outPoint?: number }): Array<{ normalizedTime: number; value: any }>;
     generateTransform(options?: Record<string, any>): Promise<GeneratedMotionIr>;
   };
-  /** @stable local request/explanation helpers. @preview AI motion provider contract. */
+  /** @stable AI namespace. Local request/explanation helpers are @stable; provider generation remains @preview. */
   ai: {
+    /** @stable Pure, deterministic, no host cost. Normalizes an AI motion request to contract v1. */
     normalizeRequest(request?: Record<string, any>): {
       contractVersion: "ai-motion-request.v1" | string;
       prompt: string;
@@ -1952,6 +1978,7 @@ export interface YoAnimeSdk {
       targetRuntimeNodeIds: string[];
       options: any;
     };
+    /** @stable Pure, deterministic, no host cost. Explains a prompt into intents. */
     explainPrompt(request?: Record<string, any>): {
       contractVersion: "ai-motion-explanation.v1" | string;
       prompt: string;
@@ -1963,6 +1990,7 @@ export interface YoAnimeSdk {
       authority: string;
       note?: string;
     };
+    /** @preview AI motion provider contract — generation fidelity may evolve. */
     generatePromptMotion(request?: Record<string, any>): Promise<GeneratedMotionIr>;
   };
   /** @stable Physics world, diagnostics, simulation, bake, primitives, and presets. */
@@ -2108,11 +2136,11 @@ export interface YoAnimeSdk {
     /** @stable Generates a two-rotation-layer timeline IR from source (shoulder) and joint (elbow) shapes. Requires source/joint with runtimeNodeId. */
     generateTwoBone(options?: IkGenerateTwoBoneOptions): Promise<IkGenerateTwoBoneResult>;
   };
-  /** @stable Expression parser/evaluator/generator surface. @internal _parse/_eval are declared for parity only. */
+  /** @stable Expression parser/evaluator/generator surface. @internal _parse/_eval are the implementation of evaluate/generateFromExpression; extensions should call evaluate or generateFromExpression. */
   expressions: {
-    /** @internal Recursive-descent expression parser (implementation detail). */
+    /** @internal Recursive-descent expression parser (implementation detail). Backing for evaluate/generateFromExpression. */
     _parse(expression: string): any;
-    /** @internal Expression AST evaluator (implementation detail). Unknown calls evaluate to 0. */
+    /** @internal Expression AST evaluator (implementation detail). Backing for evaluate/generateFromExpression. Unknown calls evaluate to 0. */
     _eval(ast: any, ctx: ExpressionContext): number;
     /** @preview Synchronously evaluates an expression against a context. Presence-only — no built-in consumer yet. */
     evaluate(expression: string, options?: ExpressionEvaluateOptions): number;
@@ -2125,17 +2153,21 @@ export interface YoAnimeSdk {
     previewRotation(angle: number, relativePivotX?: number, relativePivotY?: number): void;
     /** @preview Commits a rotation to the live PowerPoint shape over the pipe (fire-and-forget; no response). */
     commitRotation(finalAngle: number, relativePivotX?: number, relativePivotY?: number): void;
+    /** @preview Subscribe to transform change notifications (fires after successful preview/commit). */
+    onChanged(callback: (event: TransformChangedEvent) => void): () => void;
   };
   /** @preview Imperative shape commands. Fire-and-forget (void, no response). Requires shapes.write at the host (permission map L1172-1174). */
   commands: {
     /** @preview Rotates the selected shape (fire-and-forget). */
     rotate(angle: number): void;
-    /** @preview Translates the selected shape. CAVEAT: no host gateway route exists — the message is a silent no-op (unhandled). */
+    /** @preview Translates the selected shape (fire-and-forget). Requires shapes.write at the host. */
     translate(offsetX: number, offsetY: number): void;
-    /** @preview Scales the selected shape. CAVEAT: no host gateway route exists — the message is a silent no-op (unhandled). */
+    /** @preview Scales the selected shape (fire-and-forget). Requires shapes.write at the host. */
     scale(scaleX: number, scaleY: number): void;
     /** @preview Sets the custom rotation pivot on the selected shape (fire-and-forget). */
     setPivot(relativeX: number, relativeY: number): void;
+    /** @preview Subscribe to command change notifications (fires after successful rotate/translate/scale/setPivot). */
+    onChanged(callback: (event: CommandChangedEvent) => void): () => void;
   };
 }
 

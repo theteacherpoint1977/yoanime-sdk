@@ -1,3 +1,15 @@
+---
+id: doc:yoanimesdkreference-1.0.2-2
+tags:
+- reference-extension
+domain: reference-extension
+authority: reference
+lifecycle: active
+reading-priority: 5
+ai-priority: 5
+audience:
+- all
+---
 # yoAnime SDK Reference 1.0.2
 
 Status: SDK and extension platform preview.
@@ -60,7 +72,7 @@ await yoanime.runtime.ready();
 const capabilities = await yoanime.runtime.getCapabilities();
 ```
 
-`runtime.ready()` waits for the SDK bridge to be available. `runtime.getCapabilities()` reports SDK version, permissions, session identity, platform laws, and API stability.
+`runtime.ready()` waits for the SDK bridge to be available. This works directly in the taskpane surface (host-injected SDK). Overlay iframes must first load `yoAnimeBridge.js` per the [Overlay Bootstrap Standard](https://github.com/yoanime/yoanime-sdk/blob/main/reference/extension/docs/runtime/OverlayBootstrapStandard.md). `runtime.getCapabilities()` reports SDK version, permissions, session identity, platform laws, and API stability.
 
 For extension sessions, `runtime.getCapabilities()` also reports `trust` and `permissionRisk` so an extension can expose a useful diagnostics panel:
 
@@ -442,9 +454,12 @@ await yoanime.motionProviders.bake("yoanime.physics.ramp-roll", {
 
 ### Surfaces
 
-Taskpane and overlay pages are separate WebView2 instances. Communicate through the SDK bridge:
+Taskpane and overlay pages are separate WebView2 instances. The overlay runs inside an `<iframe>` in the compositor — it must load `yoAnimeBridge.js` before calling any SDK APIs. Follow the [Overlay Bootstrap Standard](https://github.com/yoanime/yoanime-sdk/blob/main/reference/extension/docs/runtime/OverlayBootstrapStandard.md):
 
 ```js
+// overlay.html — bridge script loaded before module bundle
+await yoanime.runtime.ready();
+
 await yoanime.overlay.show();
 await yoanime.overlay.setInteractive(true);
 await yoanime.overlay.postMessage({ type: "hello" });
@@ -483,6 +498,8 @@ These APIs exist, but their contract can change:
 - `webSurface.create`, `webSurface.update`, `webSurface.remove`
 - developer diagnostics toolkit APIs
 - Lottie and AI provider contracts
+- `yoanime.transforms.*` — preview host commands; `transforms.onChanged` is preview (fires after successful preview/commit)
+- `yoanime.commands.*` — preview host commands; `commands.onChanged` is preview (fires after successful rotate/translate/scale/setPivot)
 
 Use them for first-party experiments only unless you are comfortable updating your extension later.
 
@@ -491,11 +508,12 @@ Use them for first-party experiments only unless you are comfortable updating yo
 Do not use these from public extensions:
 
 - `yoanime.trajectory.*`
-- `yoanime.commands.*`
-- `yoanime.transforms.*`
+- `yoanime.expressions._parse` / `yoanime.expressions._eval` — internal implementation of `expressions.evaluate` / `expressions.generateFromExpression`; unsupported external surface, not part of the stable contract
 - `yoanime.extensions.mount/unmount/toggle`
 - raw `timeline.import/export` as a live scripting path
 - direct COM concepts, raw PowerPoint handles, host lifecycle controls, compositor ownership, raw IPC, or WPF/VSTO internals
+
+> **Expressions:** The supported extension-facing surface is `expressions.evaluate(...)` and `expressions.generateFromExpression(...)` (plus `motionProviders.generate('yoanime.expression.*')`). The underscore members `expressions._parse` and `expressions._eval` are the parser/evaluator implementation backing those two members and are not part of the supported public contract.
 
 ## Installing An Extension
 
@@ -616,3 +634,14 @@ Use these files as the public sample pack:
 - `docs/SdkSamples/1.0.2/developer-sample-pack/`
 - `docs/SdkPlatformSmokeTest-1.0.2.md`
 - `docs/SdkReleaseChecklist-1.0.2.md`
+
+---
+
+## Platform References
+
+This SDK documentation is part of the yoAnime Knowledge Management System. The authoritative platform documentation is maintained in the main repository:
+
+- [ADR-000: Permanent Runtime Model](https://github.com/yoanime/yoanime/tree/main/docs/ADR-000-Permanent-Runtime-Model.md) — Platform architecture foundation
+- [MASTER_PLAN](https://github.com/yoanime/yoanime/tree/main/docs/MASTER_PLAN.md) — Implementation roadmap
+- [Architecture Source of Truth](https://github.com/yoanime/yoanime/tree/main/docs/Architecture%20Source%20of%20Truth.md) — Platform architecture authority
+- [Reference Extension Domain](https://github.com/yoanime/yoanime/tree/main/docs/Reference%20Extension/_Overview.md) — Reference extension MOC

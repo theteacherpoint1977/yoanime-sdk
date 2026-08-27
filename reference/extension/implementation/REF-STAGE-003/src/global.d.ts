@@ -1,5 +1,5 @@
-// Global type definitions for yoAnime SDK v0.3.0 (current runtime)
-// Based on authoritative contract: CustomRotationPointApp/html/sdk/yoanime-sdk.d.ts
+// Global type definitions for yoAnime SDK v0.4.0 (current runtime)
+// Based on authoritative contract: CustomRotationPointApp/html/sdk/yoanime-sdk.d.ts (B7C96E43)
 
 export interface YoAnimeCapabilities {
   sdkVersion: string;
