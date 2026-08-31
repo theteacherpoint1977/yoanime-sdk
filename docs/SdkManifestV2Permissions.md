@@ -1,3 +1,15 @@
+---
+id: doc:sdkmanifestv2permissions-2
+tags:
+- contracts
+domain: contracts
+authority: reference
+lifecycle: active
+reading-priority: 1
+ai-priority: 5
+audience:
+- all
+---
 # Manifest v2 and Permissions
 
 Extensions declare `yoanime-extension.json` or `manifest.json` with `manifestVersion: 2`.
@@ -98,6 +110,12 @@ Non-mutating local helpers such as `yoanime.noise.*`, pure `yoanime.constraints.
 
 `diagnostics.read`
 - Developer diagnostics toolkit commands. Not needed by ordinary extensions.
+
+`animation.read`
+- `animation.list`, `animation.get`, `animation.preview`, and `animation.changed` events.
+
+`animation.write`
+- `animation.create`, `animation.update`, `animation.remove`, `animation.reorder`, `animation.commit`, `animation.save`, `animation.load`, `animation.undo`, `animation.redo`.
 
 ## Surface Map
 

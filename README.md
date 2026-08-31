@@ -1,3 +1,15 @@
+---
+id: doc:readme-28
+tags:
+- engineering
+domain: engineering
+authority: reference
+lifecycle: active
+reading-priority: 5
+ai-priority: 5
+audience:
+- all
+---
 # yoAnime SDK
 
 Build JavaScript/HTML extensions for PowerPoint motion, timelines, physics, procedural animation, and live web experiences.
@@ -48,6 +60,8 @@ await yoanime.motionProviders.bake("yoanime.noise.wiggle-position", {
 });
 ```
 
+> **For overlay extensions:** Follow the [Overlay Bootstrap Standard](https://github.com/yoanime/yoanime-sdk/blob/main/reference/extension/docs/runtime/OverlayBootstrapStandard.md) — load `yoAnimeBridge.js`, wait for `window.yoanime`, then call `runtime.ready()`. Every shipped overlay extension follows this sequence.
+
 ## Start Here
 
 - [Developer Quick Start](docs/DeveloperQuickStart-1.0.2.md)
@@ -57,6 +71,7 @@ await yoanime.motionProviders.bake("yoanime.noise.wiggle-position", {
 - [Packaging Workflow](docs/ExtensionPackagingWorkflow.md)
 - [Architecture Overview](docs/ArchitectureOverview.md)
 - [Known Limitations](docs/KnownLimitations-1.0.2.md)
+- [Reference Extension Certification Suite](reference/extension/certification/README.md) — Release gate for all Reference Extension stages
 
 ## Repository Layout
 

@@ -1,3 +1,15 @@
+---
+id: doc:readme-40
+tags:
+- engineering
+domain: engineering
+authority: reference
+lifecycle: active
+reading-priority: 5
+ai-priority: 5
+audience:
+- all
+---
 # Shape Choreographer
 
 **A multi-shape entrance animation sequencer for yoAnime 1.0.2.**

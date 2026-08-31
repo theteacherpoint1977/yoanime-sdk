@@ -1,3 +1,15 @@
+---
+id: doc:extensionpackagingworkflow-2
+tags:
+- engineering
+domain: engineering
+authority: reference
+lifecycle: active
+reading-priority: 5
+ai-priority: 5
+audience:
+- all
+---
 # Extension Platform Workflow
 
 This is the official yoAnime `1.0.2.0` extension onboarding path.

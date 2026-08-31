@@ -1,3 +1,15 @@
+---
+id: doc:demo-links
+tags:
+- engineering
+domain: engineering
+authority: reference
+lifecycle: active
+reading-priority: 5
+ai-priority: 5
+audience:
+- all
+---
 # Demo Links
 
 Add public demo links here.

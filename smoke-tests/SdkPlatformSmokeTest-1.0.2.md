@@ -1,3 +1,15 @@
+---
+id: doc:sdkplatformsmoketest-1.0.2-2
+tags:
+- engineering
+domain: engineering
+authority: reference
+lifecycle: active
+reading-priority: 5
+ai-priority: 5
+audience:
+- all
+---
 # SDK Platform Smoke Test 1.0.2
 
 Run this checklist before publishing the SDK/extension platform preview.
@@ -18,7 +30,7 @@ For extension install/package validation, use `docs/ExtensionPackageContract-1.0
 
 ## Runtime And Capabilities
 
-Open Two Surface Starter and run this in the overlay console:
+Open Two Surface Starter and run this in the overlay console (note: the starter's `overlay.html` must load `yoAnimeBridge.js` per [OverlayBootstrapStandard.md](https://github.com/yoanime/yoanime-sdk/blob/main/reference/extension/docs/runtime/OverlayBootstrapStandard.md)):
 
 ```js
 await yoanime.runtime.ready();

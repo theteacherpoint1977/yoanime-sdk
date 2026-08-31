@@ -1,3 +1,15 @@
+---
+id: doc:developerquickstart-1.0.2-2
+tags:
+- engineering
+domain: engineering
+authority: reference
+lifecycle: active
+reading-priority: 5
+ai-priority: 5
+audience:
+- all
+---
 # Developer Quick Start 1.0.2
 
 This is the shortest path for building and testing a yoAnime extension.
@@ -88,6 +100,8 @@ await yoanime.timeline.bake({
 yoanime.timeline.playFrom(0);
 ```
 
+> **For overlay extensions:** The code above works in the taskpane surface (top-level WebView2 with host-injected SDK). Overlay iframes require the [Overlay Bootstrap Standard](https://github.com/yoanime/yoanime-sdk/blob/main/reference/extension/docs/runtime/OverlayBootstrapStandard.md): load `yoAnimeBridge.js`, wait for `window.yoanime` via polling, then call `runtime.ready()`.
+
 ## 5. Verify Before Sharing
 
 Run:
@@ -119,3 +133,14 @@ Also verify:
 - Use `geometry.slideToScreen()` and `geometry.screenToSlide()` only for projection and hit testing.
 
 Never write screen pixels into `PositionX` or `PositionY`.
+
+---
+
+## Platform References
+
+This SDK documentation is part of the yoAnime Knowledge Management System. The authoritative platform documentation is maintained in the main repository:
+
+- [ADR-000: Permanent Runtime Model](https://github.com/yoanime/yoanime/tree/main/docs/ADR-000-Permanent-Runtime-Model.md) — Platform architecture foundation
+- [MASTER_PLAN](https://github.com/yoanime/yoanime/tree/main/docs/MASTER_PLAN.md) — Implementation roadmap
+- [Architecture Source of Truth](https://github.com/yoanime/yoanime/tree/main/docs/Architecture%20Source%20of%20Truth.md) — Platform architecture authority
+- [Reference Extension Domain](https://github.com/yoanime/yoanime/tree/main/docs/Reference%20Extension/_Overview.md) — Reference extension MOC

@@ -362,6 +362,7 @@ export type YoAnimeSdkEventName =
   | "motionproviders.changed"
   | "transforms.changed"
   | "commands.changed"
+  | "animation.changed"
   | "runtime.warning"
   | "runtime.sessionEnded";
 
@@ -1424,6 +1425,198 @@ export interface RelationshipGetPositionsResponse {
   success: boolean;
 }
 
+// ── Animation contract surface (Mission 11B additive): animation authoring ──
+// Facade reference: YoAnimeSdkProvider.cs animation namespace. Additive-only; no existing declaration modified.
+
+/** Animation type taxonomy. Closed at the single V1 type for v0.5; future types may be added in minor versions. */
+export type AnimationType = "Keyframe";
+
+/** Per-type parameter set carried by create/update/read. Fields irrelevant to a type are simply not used. */
+export interface AnimationParameters {
+  /** Animation duration in seconds. */
+  durationSeconds?: number;
+  /** Ordered list of layer specifications for the animation. */
+  layers?: AnimationLayerSpec[];
+  /** Optional metadata for the animation (e.g., motion provider provenance). */
+  metadata?: Record<string, any>;
+}
+
+/** Per-layer specification for an animation. */
+export interface AnimationLayerSpec {
+  /** The target shape's stable runtime identity. */
+  runtimeNodeId: string;
+  /** Property tracks for this layer. */
+  properties: Record<string, {
+    propertyKind: RuntimePropertyKind | string;
+    startTimeSeconds?: number;
+    durationSeconds?: number;
+    delaySeconds?: number;
+    easingFunction?: string;
+    keyframes: RuntimePropertyKeyframe[];
+    interpolation?: {
+      easingFunction?: string;
+      isAdditive?: boolean;
+      blendMode?: string;
+    };
+  }>;
+  /** Optional motion provider provenance for this layer. */
+  motionProvider?: {
+    providerId: string;
+    options?: Record<string, any>;
+  };
+}
+
+/** List-view row of one animation definition. Order is conveyed by list position (membership order). */
+export interface AnimationSummary {
+  animationId: string;
+  label?: string;
+  durationSeconds?: number;
+  enabled: boolean;
+  layerCount: number;
+}
+
+/** Full serialized view of one animation definition. Never carries derived facts (preview/commit state, currentTime, etc.). */
+export interface AnimationDto {
+  animationId: string;
+  label?: string;
+  durationSeconds: number;
+  enabled: boolean;
+  layers: AnimationLayerSpec[];
+  metadata?: Record<string, any>;
+  version: number;
+  createdAt: number;
+  updatedAt: number;
+}
+
+/** The list() read projection: the ordered set of animations for the current scene. Never null; empty array when no animations. */
+export interface AnimationListResponse {
+  animations: AnimationSummary[];
+}
+
+/** The get(id) read projection: the full definition view, or not-found when identity is absent or retired. */
+export interface AnimationGetResponse {
+  animation: AnimationDto | null;
+}
+
+/** The create proposal (intent). No identity field — the AnimationId is host-minted. */
+export interface AnimationCreateInput {
+  label?: string;
+  durationSeconds?: number;
+  layers?: AnimationLayerSpec[];
+  metadata?: Record<string, any>;
+  enabled?: boolean;
+}
+
+/** The host verdict for a create: the accepted definition carrying the host-minted canonical identity. */
+export interface AnimationCreateResponse {
+  animation: AnimationDto;
+}
+
+/** The change patch (intent). Carries the target identity plus changeable facts only. */
+export interface AnimationUpdateInput {
+  animationId: string;
+  label?: string;
+  durationSeconds?: number;
+  layers?: AnimationLayerSpec[];
+  metadata?: Record<string, any>;
+  enabled?: boolean;
+}
+
+/** The host verdict for an update: the resulting definition after the authority applied the patch. */
+export interface AnimationUpdateResponse {
+  animation: AnimationDto;
+}
+
+/** The host verdict for a remove: removal acknowledged with the retired identity. */
+export interface AnimationRemoveResponse {
+  animationId: string;
+}
+
+/** The reorder proposal. Scene Animation membership order only. */
+export interface AnimationReorderInput {
+  animationId: string;
+  newIndex: number;
+}
+
+/** The host verdict for a reorder. */
+export interface AnimationReorderResponse {
+  animation: AnimationDto;
+}
+
+/** Preview proposal (ghost preview — no host mutation). */
+export interface AnimationPreviewInput {
+  animationId: string;
+  /** Optional duration override for preview. */
+  durationSeconds?: number;
+}
+
+/** Host verdict for a preview: the generated motion IR (ghost). */
+export interface AnimationPreviewResponse {
+  ir: GeneratedMotionIr;
+}
+
+/** Commit proposal (applies animation to timeline). */
+export interface AnimationCommitInput {
+  animationId: string;
+  /** Optional label for the resulting timeline bake. */
+  label?: string;
+}
+
+/** Host verdict for a commit: the resulting timeline state. */
+export interface AnimationCommitResponse {
+  success: boolean;
+  animationId: string;
+  timeline?: TimelineSnapshot;
+  timelineVersion?: number;
+}
+
+/** Save proposal (persist animation definition to slot). */
+export interface AnimationSaveInput {
+  animationId: string;
+  /** Optional slot name; auto-generated if omitted. */
+  slot?: string;
+}
+
+/** Host verdict for a save. */
+export interface AnimationSaveResponse {
+  success: boolean;
+  animationId: string;
+  slot?: string;
+}
+
+/** Load proposal (restore animation definition from slot). */
+export interface AnimationLoadInput {
+  /** Optional animationId to load into; if omitted, creates new animation. */
+  animationId?: string;
+  /** Slot name to load from. */
+  slot: string;
+}
+
+/** Host verdict for a load. */
+export interface AnimationLoadResponse {
+  animation: AnimationDto;
+  success: boolean;
+}
+
+/** Undo response. */
+export interface AnimationUndoResponse {
+  success: boolean;
+  animationId?: string;
+}
+
+/** Redo response. */
+export interface AnimationRedoResponse {
+  success: boolean;
+  animationId?: string;
+}
+
+/** Animation graph-changed notification payload. Notification only — scene identity + targeted animation identity. */
+export interface AnimationChangedEvent {
+  sceneId: string;
+  animationId?: string;
+  operation?: "create" | "update" | "remove" | "reorder" | "enable" | "disable" | "preview" | "commit";
+}
+
 // ── Motion contract surface (Mission #3 additive): ik / expressions / transforms / commands ──
 // Facade reference: YoAnimeSdkProvider.cs (ik L3189-3346, expressions L3348-3538,
 // transforms L2805-2821, commands L5586-5619). Additive-only; no existing declaration modified.
@@ -2168,6 +2361,35 @@ export interface YoAnimeSdk {
     setPivot(relativeX: number, relativeY: number): void;
     /** @preview Subscribe to command change notifications (fires after successful rotate/translate/scale/setPivot). */
     onChanged(callback: (event: CommandChangedEvent) => void): () => void;
+  };
+  /** @preview Animation authoring shell. Preview in v0.5; composes timeline, motionProviders, transforms, and commands. */
+  animation: {
+    /** @preview Creates a new animation definition; host mints the canonical animationId. */
+    create(input: AnimationCreateInput): Promise<AnimationCreateResponse>;
+    /** @preview Lists all animations for the current scene in membership order. */
+    list(): Promise<AnimationListResponse>;
+    /** @preview Gets a single animation definition by its canonical identity. */
+    get(animationId: string): Promise<AnimationGetResponse>;
+    /** @preview Updates an existing animation definition (layers/label/enabled/duration). */
+    update(animationId: string, patch: AnimationUpdateInput): Promise<AnimationUpdateResponse>;
+    /** @preview Removes an animation definition from the scene; the host retires the identity. */
+    remove(animationId: string): Promise<AnimationRemoveResponse>;
+    /** @preview Changes the membership order of an animation in the scene's ordered list. */
+    reorder(animationId: string, newIndex: number): Promise<AnimationReorderResponse>;
+    /** @preview Subscribes to animation graph-change notifications; returns an unsubscribe function. */
+    onChanged(callback: (event: AnimationChangedEvent) => void): () => void;
+    /** @preview Generates a ghost preview of the animation (no host mutation). */
+    preview(input: AnimationPreviewInput): Promise<AnimationPreviewResponse>;
+    /** @preview Commits the animation to the timeline (bakes layers, appends to history). */
+    commit(input: AnimationCommitInput): Promise<AnimationCommitResponse>;
+    /** @preview Saves the animation definition to a named slot for later reuse. */
+    save(input: AnimationSaveInput): Promise<AnimationSaveResponse>;
+    /** @preview Loads an animation definition from a slot (creates new or replaces existing). */
+    load(input: AnimationLoadInput): Promise<AnimationLoadResponse>;
+    /** @preview Undoes the last authoring mutation within this session. */
+    undo(): Promise<AnimationUndoResponse>;
+    /** @preview Redoes the previously undone authoring mutation. */
+    redo(): Promise<AnimationRedoResponse>;
   };
 }
 

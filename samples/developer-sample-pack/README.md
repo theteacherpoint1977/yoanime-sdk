@@ -1,3 +1,15 @@
+---
+id: doc:readme-34
+tags:
+- engineering
+domain: engineering
+authority: reference
+lifecycle: active
+reading-priority: 5
+ai-priority: 5
+audience:
+- all
+---
 # yoAnime Developer Sample Pack
 
 Phase 103 turns the loose SDK smoke scripts into installable extension examples.
@@ -18,6 +30,7 @@ Choose one of the folders below or its `manifest.json`.
 | `runtime-channel-websurface` | taskpane/overlay runtime channels and Web Surface event bridge | Open taskpane, click `Open Overlay`, insert/switch to a Web Surface, watch events |
 | `data-source-motion` | data source provider plus data-driven motion provider | Select a shape, click `Register Source`, then `Bake Data Motion` |
 | `lottie-ai-motion` | Lottie transform extraction and AI motion contract | Select a shape, click `Bake Lottie`, then `Bake AI Prompt` |
+| `particle-system` | 2D particle physics with canvas preview, batch mutation COM bridge, and timeline bake | Select shapes, click `Apply Shapes`, open overlay, click `Play`, then `Bake` |
 
 ## Expected Logs
 

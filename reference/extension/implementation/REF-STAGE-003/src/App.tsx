@@ -9,6 +9,7 @@ import { MotionPanel } from './components/MotionPanel';
 import { TimelinePanel } from './components/TimelinePanel';
 import { PlaybackPanel } from './components/PlaybackPanel';
 import { ScenePanel } from './components/ScenePanel';
+import { AnimationPanel } from './components/AnimationPanel';
 import { SDKStatusBar } from './components/SDKStatusBar';
 import { LogPanel } from './components/LogPanel';
 import { useLog } from './hooks/useLog';
@@ -32,20 +33,21 @@ export function App({ capabilities, sdk }: AppProps) {
     }
   }, [capabilities]);
 
-  const tabs = [
-    { id: 'capabilities', label: 'Capabilities', icon: '🔧' },
-    { id: 'selection', label: 'Selection', icon: '🎯' },
-    { id: 'behavior', label: 'Behavior', icon: '🤖' },
+const tabs = [
+    { id: 'capabilities', label: 'Capabilities', icon: '📋' },
+    { id: 'selection', label: 'Selection', icon: '🔍' },
+    { id: 'behavior', label: 'Behavior', icon: '🎯' },
     { id: 'relationship', label: 'Relationship', icon: '🔗' },
-    { id: 'constraints', label: 'Constraints', icon: '📏' },
-    { id: 'articulation', label: 'Articulation', icon: '🦴' },
+    { id: 'constraints', label: 'Constraints', icon: '⚖️' },
+    { id: 'articulation', label: 'Articulation', icon: '🦾' },
     { id: 'scene', label: 'Scene', icon: '🎬' },
-    { id: 'motion', label: 'Motion', icon: '🌊' },
+    { id: 'animation', label: 'Animation', icon: '🎞️' },
+    { id: 'motion', label: 'Motion', icon: '🌀' },
     { id: 'timeline', label: 'Timeline', icon: '⏱️' },
     { id: 'playback', label: 'Playback', icon: '▶️' },
   ];
 
-  const renderPanel = () => {
+const renderPanel = () => {
     if (!sdk && activeTab !== 'capabilities') {
       return <div className="p-6 text-center text-gray-500">SDK not ready — check console.</div>;
     }
@@ -64,6 +66,8 @@ export function App({ capabilities, sdk }: AppProps) {
         return <ArticulationPanel sdk={sdk!} addLog={addLog} />;
       case 'scene':
         return <ScenePanel sdk={sdk!} addLog={addLog} />;
+      case 'animation':
+        return <AnimationPanel sdk={sdk!} addLog={addLog} />;
       case 'motion':
         return <MotionPanel sdk={sdk!} addLog={addLog} />;
       case 'timeline':

@@ -1,3 +1,15 @@
+---
+id: doc:knownlimitations-1.0.2
+tags:
+- engineering
+domain: engineering
+authority: reference
+lifecycle: active
+reading-priority: 5
+ai-priority: 5
+audience:
+- all
+---
 # Known Limitations 1.0.2
 
 yoAnime `1.0.2.0` is an SDK and Extension Platform Preview.

@@ -1,3 +1,15 @@
+---
+id: doc:readme-33
+tags:
+- engineering
+domain: engineering
+authority: reference
+lifecycle: active
+reading-priority: 5
+ai-priority: 5
+audience:
+- all
+---
 # yoAnime SDK Samples 1.0.2
 
 These scripts are copy-paste samples for extension consoles and starter pages. They use the stable `1.0.2.0` SDK path wherever possible.
@@ -29,7 +41,8 @@ Legend: `[stable]` uses the conservative public `1.0.2.0` SDK path. `[preview]` 
 - `[preview]` `19-data-source-provider-sdk.js`: registers a Phase 100 data source, verifies cache/refresh behavior, and uses it inside a data-driven motion provider.
 - `[preview]` `20-lottie-transform-provider.js`: uses the built-in Phase 101 Lottie transform extractor to generate and bake motion from tiny inline Lottie JSON.
 - `[preview]` `21-ai-motion-provider-contract.js`: exercises the Phase 102 vendor-neutral AI motion contract with deterministic local prompt motion.
-- `[preview]` `developer-sample-pack/`: Phase 103 installable extension examples for provider packs, runtime channels, Web Surface events, data sources, Lottie, and AI motion.
+- `[preview]` `22-particle-system.js`: demonstrates `yoanime.scene.batchMutate()` for COM-safe batch mutation and `timeline.bake()` for keyframe persistence.
+- `[preview]` `developer-sample-pack/`: Phase 103 installable extension examples for provider packs, runtime channels, Web Surface events, data sources, Lottie, AI motion, and particle systems.
 - `[stable]` `extension-package-template/`: minimal installable taskpane plus overlay package.
 
 ## Package Contract

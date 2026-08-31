@@ -1,9 +1,10 @@
 ---
 name: Feature request
 about: Suggest an SDK capability or sample
-title: "[Feature] "
+title: '[Feature] '
 labels: enhancement
-assignees: ""
+assignees: ''
+reading-priority: 5
 ---
 
 ## What do you want to build?

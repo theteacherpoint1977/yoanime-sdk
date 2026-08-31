@@ -1,3 +1,15 @@
+---
+id: doc:code-of-conduct
+tags:
+- governance
+domain: governance
+authority: reference
+lifecycle: active
+reading-priority: 1
+ai-priority: 5
+audience:
+- all
+---
 # Code of Conduct
 
 Be respectful, practical, and constructive.

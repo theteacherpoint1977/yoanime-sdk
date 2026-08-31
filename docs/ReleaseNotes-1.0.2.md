@@ -1,3 +1,15 @@
+---
+id: doc:releasenotes-1.0.2-2
+tags:
+- engineering
+domain: engineering
+authority: reference
+lifecycle: active
+reading-priority: 5
+ai-priority: 5
+audience:
+- all
+---
 # yoAnime Studio 1.0.2.0 Release Notes
 
 Release type: SDK and Extension Platform Preview

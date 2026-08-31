@@ -1,3 +1,15 @@
+---
+id: doc:architectureoverview
+tags:
+- architecture
+domain: architecture
+authority: reference
+lifecycle: active
+reading-priority: 1
+ai-priority: 5
+audience:
+- all
+---
 # yoAnime SDK Architecture Overview
 
 yoAnime Studio uses a native-first hybrid architecture.
@@ -48,3 +60,13 @@ yoAnime can render live web experiences inside PowerPoint slides. Web content is
 
 Extension manifests declare permissions such as `selection.read`, `scene.read`, `timeline.write`, `interaction.write`, and `surface.messaging`. The host gateway enforces permissions at runtime.
 
+---
+
+## Platform References
+
+This SDK documentation is part of the yoAnime Knowledge Management System. The authoritative platform documentation is maintained in the main repository:
+
+- [ADR-000: Permanent Runtime Model](https://github.com/yoanime/yoanime/tree/main/docs/ADR-000-Permanent-Runtime-Model.md) — Platform architecture foundation
+- [MASTER_PLAN](https://github.com/yoanime/yoanime/tree/main/docs/MASTER_PLAN.md) — Implementation roadmap
+- [Architecture Source of Truth](https://github.com/yoanime/yoanime/tree/main/docs/Architecture%20Source%20of%20Truth.md) — Platform architecture authority
+- [Reference Extension Domain](https://github.com/yoanime/yoanime/tree/main/docs/Reference%20Extension/_Overview.md) — Reference extension MOC

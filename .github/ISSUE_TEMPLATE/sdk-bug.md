@@ -1,9 +1,10 @@
 ---
 name: SDK bug
 about: Report a problem with the public SDK, samples, or docs
-title: "[SDK Bug] "
+title: '[SDK Bug] '
 labels: bug
-assignees: ""
+assignees: ''
+reading-priority: 5
 ---
 
 ## What happened?

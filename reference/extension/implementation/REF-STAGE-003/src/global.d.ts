@@ -453,21 +453,178 @@ export interface ConstraintsApi {
   onChanged(callback: (event: ConstraintChangedEvent) => void): () => void;
 }
 
-// Scene Roles
-export interface RolesSetOptions {
-  roles?: string[];
-  tags?: string[];
-  metadata?: Record<string, string>;
+// Animation Types
+export type AnimationType = "Keyframe";
+
+export interface AnimationLayerSpec {
+  runtimeNodeId: string;
+  properties: Record<string, {
+    propertyKind: string;
+    startTimeSeconds?: number;
+    durationSeconds?: number;
+    delaySeconds?: number;
+    easingFunction?: string;
+    keyframes: Array<{
+      normalizedTime: number;
+      value: any;
+      easingOverride?: string;
+    }>;
+    interpolation?: {
+      easingFunction?: string;
+      isAdditive?: boolean;
+      blendMode?: string;
+    };
+  }>;
+  motionProvider?: {
+    providerId: string;
+    options?: Record<string, any>;
+  };
 }
 
-export interface RolesSetResult {
+export interface AnimationParameters {
+  durationSeconds?: number;
+  layers?: AnimationLayerSpec[];
+  metadata?: Record<string, any>;
+}
+
+export interface AnimationSummary {
+  animationId: string;
+  label?: string;
+  durationSeconds?: number;
+  enabled: boolean;
+  layerCount: number;
+}
+
+export interface AnimationDto {
+  animationId: string;
+  label?: string;
+  durationSeconds: number;
+  enabled: boolean;
+  layers: AnimationLayerSpec[];
+  metadata?: Record<string, any>;
+  version: number;
+  createdAt: number;
+  updatedAt: number;
+}
+
+export interface AnimationListResponse {
+  animations: AnimationSummary[];
+}
+
+export interface AnimationGetResponse {
+  animation: AnimationDto | null;
+}
+
+export interface AnimationCreateInput {
+  label?: string;
+  durationSeconds?: number;
+  layers?: AnimationLayerSpec[];
+  metadata?: Record<string, any>;
+  enabled?: boolean;
+}
+
+export interface AnimationCreateResponse {
+  animation: AnimationDto;
+}
+
+export interface AnimationUpdateInput {
+  animationId: string;
+  label?: string;
+  durationSeconds?: number;
+  layers?: AnimationLayerSpec[];
+  metadata?: Record<string, any>;
+  enabled?: boolean;
+}
+
+export interface AnimationUpdateResponse {
+  animation: AnimationDto;
+}
+
+export interface AnimationRemoveResponse {
+  animationId: string;
+}
+
+export interface AnimationReorderInput {
+  animationId: string;
+  newIndex: number;
+}
+
+export interface AnimationReorderResponse {
+  animation: AnimationDto;
+}
+
+export interface AnimationPreviewInput {
+  animationId: string;
+  durationSeconds?: number;
+}
+
+export interface AnimationPreviewResponse {
+  ir: any;
+}
+
+export interface AnimationCommitInput {
+  animationId: string;
+  label?: string;
+}
+
+export interface AnimationCommitResponse {
   success: boolean;
-  runtimeNodeId: string;
-  roles: string[];
-  tags: string[];
-  metadata: Record<string, string>;
-  transactionId: string;
-  error?: string;
+  animationId: string;
+  timeline?: any;
+  timelineVersion?: number;
+}
+
+export interface AnimationSaveInput {
+  animationId: string;
+  slot?: string;
+}
+
+export interface AnimationSaveResponse {
+  success: boolean;
+  animationId: string;
+  slot?: string;
+}
+
+export interface AnimationLoadInput {
+  animationId?: string;
+  slot: string;
+}
+
+export interface AnimationLoadResponse {
+  animation: AnimationDto;
+  success: boolean;
+}
+
+export interface AnimationUndoResponse {
+  success: boolean;
+  animationId?: string;
+}
+
+export interface AnimationRedoResponse {
+  success: boolean;
+  animationId?: string;
+}
+
+export interface AnimationChangedEvent {
+  sceneId: string;
+  animationId?: string;
+  operation?: "create" | "update" | "remove" | "reorder" | "enable" | "disable" | "preview" | "commit";
+}
+
+export interface AnimationApi {
+  create(input: AnimationCreateInput): Promise<AnimationCreateResponse>;
+  list(): Promise<AnimationListResponse>;
+  get(animationId: string): Promise<AnimationGetResponse>;
+  update(animationId: string, patch: AnimationUpdateInput): Promise<AnimationUpdateResponse>;
+  remove(animationId: string): Promise<AnimationRemoveResponse>;
+  reorder(animationId: string, newIndex: number): Promise<AnimationReorderResponse>;
+  onChanged(callback: (event: AnimationChangedEvent) => void): () => void;
+  preview(input: AnimationPreviewInput): Promise<AnimationPreviewResponse>;
+  commit(input: AnimationCommitInput): Promise<AnimationCommitResponse>;
+  save(input: AnimationSaveInput): Promise<AnimationSaveResponse>;
+  load(input: AnimationLoadInput): Promise<AnimationLoadResponse>;
+  undo(): Promise<AnimationUndoResponse>;
+  redo(): Promise<AnimationRedoResponse>;
 }
 
 export interface SceneApi {
@@ -542,6 +699,7 @@ export interface YoAnimeSdk {
   behavior: BehaviorApi;
   relationship: RelationshipApi;
   constraints: ConstraintsApi;
+  animation: AnimationApi;
   scene: SceneApi;
   timeline: TimelineApi;
   playback: PlaybackApi;

@@ -1,3 +1,15 @@
+---
+id: doc:readme-38
+tags:
+- engineering
+domain: engineering
+authority: reference
+lifecycle: active
+reading-priority: 5
+ai-priority: 5
+audience:
+- all
+---
 # Sample Procedural Provider Pack
 
 Demonstrates:

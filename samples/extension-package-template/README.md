@@ -1,3 +1,15 @@
+---
+id: doc:readme-41
+tags:
+- engineering
+domain: engineering
+authority: reference
+lifecycle: active
+reading-priority: 5
+ai-priority: 5
+audience:
+- all
+---
 # yoAnime Extension Package Template
 
 This folder is a minimal public `1.0.2.0` extension package shape.

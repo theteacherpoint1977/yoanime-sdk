@@ -1,3 +1,15 @@
+---
+id: doc:extensionpackagecontract-1.0.2-2
+tags:
+- contracts
+domain: contracts
+authority: reference
+lifecycle: active
+reading-priority: 1
+ai-priority: 5
+audience:
+- all
+---
 # Extension Package Contract 1.0.2
 
 Phase 66 freezes the public extension package contract for yoAnime `1.0.2.0`.
@@ -250,7 +262,7 @@ Do not build public `1.0.2.0` extensions around:
 
 ## Developer Rules
 
-- Always wait for `yoanime.runtime.ready()`.
+- Always wait for `yoanime.runtime.ready()`. (Overlay surfaces must first load `yoAnimeBridge.js` per the [Overlay Bootstrap Standard](https://github.com/yoanime/yoanime-sdk/blob/main/reference/extension/docs/runtime/OverlayBootstrapStandard.md).)
 - Use `runtimeNodeId` for identity.
 - Use PowerPoint slide points for timeline values.
 - Use `scene.get({ includeGeometry: true, includeTags: true })` for shape positions and metadata.
@@ -323,4 +335,4 @@ docs/SdkSamples/1.0.2/extension-package-template/
 
 It is intentionally simple: one manifest, one taskpane, one overlay, and no build step.
 
-For two-surface packages, include the SDK bridge helper files from the public template unless your page is intentionally using a host-injected bridge. The template files provide window.yoanime plus overlay click-through/focus behavior and keep the package self-contained for local installation.
+For two-surface packages, include `yoAnimeBridge.js` in your overlay per the [Overlay Bootstrap Standard](https://github.com/yoanime/yoanime-sdk/blob/main/reference/extension/docs/runtime/OverlayBootstrapStandard.md). The public template provides this file. Overlay iframes require the bridge — the host SDK is injected only at the top-level WebView2.

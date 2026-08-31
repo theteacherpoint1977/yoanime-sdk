@@ -1,3 +1,15 @@
+---
+id: doc:contributing
+tags:
+- engineering
+domain: engineering
+authority: reference
+lifecycle: active
+reading-priority: 5
+ai-priority: 5
+audience:
+- all
+---
 # Contributing
 
 Thanks for your interest in yoAnime SDK.

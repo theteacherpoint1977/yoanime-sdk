@@ -1,3 +1,15 @@
+---
+id: doc:readme-35
+tags:
+- engineering
+domain: engineering
+authority: reference
+lifecycle: active
+reading-priority: 5
+ai-priority: 5
+audience:
+- all
+---
 # Sample Data Source Motion
 
 Demonstrates:

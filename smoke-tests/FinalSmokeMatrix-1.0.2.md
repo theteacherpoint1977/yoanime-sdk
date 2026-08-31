@@ -1,3 +1,15 @@
+---
+id: doc:finalsmokematrix-1.0.2-2
+tags:
+- engineering
+domain: engineering
+authority: reference
+lifecycle: active
+reading-priority: 5
+ai-priority: 5
+audience:
+- all
+---
 # Final Smoke Matrix 1.0.2.0
 
 Run this matrix before packaging and before Microsoft Store submission.

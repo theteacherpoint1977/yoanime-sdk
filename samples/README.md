@@ -1,3 +1,15 @@
+---
+id: doc:readme-32
+tags:
+- engineering
+domain: engineering
+authority: reference
+lifecycle: active
+reading-priority: 5
+ai-priority: 5
+audience:
+- all
+---
 # yoAnime SDK Samples
 
 This folder contains public yoAnime `1.0.2.0` SDK samples.

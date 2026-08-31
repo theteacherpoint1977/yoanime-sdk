@@ -1,3 +1,15 @@
+---
+id: doc:security
+tags:
+- governance
+domain: governance
+authority: reference
+lifecycle: active
+reading-priority: 1
+ai-priority: 5
+audience:
+- all
+---
 # Security Policy
 
 yoAnime extensions run inside a permissioned SDK model. Public extensions should not depend on raw PowerPoint COM objects, native handles, filesystem internals, or private IPC routes.
