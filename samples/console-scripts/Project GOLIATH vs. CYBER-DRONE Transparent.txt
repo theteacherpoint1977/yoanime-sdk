@@ -1,0 +1,623 @@
+(async function yoAnimeMechaVsDroneShowcase() {
+  "use strict";
+
+  console.clear();
+  console.log(
+    "%c⚔️ yoAnime Studio — Project CLASH: Goliath Mech vs. Cyber-Drone (Characters Only)",
+    "color: #ef4444; font-size: 16px; font-weight: bold; text-shadow: 0 0 14px rgba(239,68,68,0.8);"
+  );
+
+  const sdk = window.yoanime;
+  if (!sdk?.scene?.build || !sdk?.timeline?.bake || !sdk?.timeline?.play) {
+    console.error("❌ Required yoAnime SDK APIs not found.");
+    return;
+  }
+
+  await sdk.runtime.ready();
+
+  // ==========================================================================
+  // 1. COMBAT GEOMETRY & TRAJECTORY CONFIGURATION
+  // ==========================================================================
+  const CONFIG = {
+    duration: 12.0, // 12-second complete cinematic combat sequence
+    fps: 30,
+    slide: { width: 960, height: 540 },
+
+    // Mech Parameters
+    mech: {
+      startX: 140,
+      endX: 380, // Heavy advance to combat posture
+      groundY: 430,
+      pelvisBaseY: 310,
+      thighLen: 56,
+      shinLen: 52,
+      cannonLen: 64
+    },
+
+    // Drone Dogfight Spline Waypoints
+    drone: {
+      path: [
+        { t: 0.00, x: 860, y: 110, bank: -15 }, // High Entry
+        { t: 0.25, x: 620, y: 170, bank: -25 }, // Target Lock
+        { t: 0.42, x: 440, y: 220, bank: -35 }, // Strafe Dive (Fires Lasers)
+        { t: 0.60, x: 380, y: 200, bank:  10 }, // Pull Up
+        { t: 0.75, x: 680, y: 110, bank:  45 }, // Evasive Climb (Avoids Flak)
+        { t: 0.90, x: 780, y: 190, bank: -10 }, // Standoff Orbit
+        { t: 1.00, x: 860, y: 110, bank: -15 }  // Reset Loop
+      ],
+      width: 48,
+      height: 22
+    }
+  };
+
+  const totalFrames = Math.round(CONFIG.duration * CONFIG.fps);
+  const round2 = (v) => Math.round(v * 100) / 100;
+  const toDeg = (rad) => (rad * 180) / Math.PI;
+  const toRad = (deg) => (deg * Math.PI) / 180;
+
+  // Reverse-Joint (Digitigrade) 2-Bone IK Solver for Mech Legs
+  function solveReverseLegIK(hip, foot, l1, l2) {
+    const dx = foot.x - hip.x;
+    const dy = foot.y - hip.y;
+    let dist = Math.hypot(dx, dy);
+    dist = Math.min(Math.max(dist, 15), l1 + l2 - 0.5);
+
+    const cosAngle2 = (dist * dist - l1 * l1 - l2 * l2) / (2 * l1 * l2);
+    const angle2 = -Math.acos(Math.min(Math.max(cosAngle2, -1), 1)); // Reverse knee bend
+
+    const baseAngle = Math.atan2(dy, dx);
+    const cosAngle1 = (dist * dist + l1 * l1 - l2 * l2) / (2 * dist * l1);
+    const angle1 = baseAngle + Math.acos(Math.min(Math.max(cosAngle1, -1), 1));
+
+    return {
+      thighAngleDeg: toDeg(angle1),
+      shinAngleDeg: toDeg(angle1 + angle2),
+      kneePos: {
+        x: hip.x + Math.cos(angle1) * l1,
+        y: hip.y + Math.sin(angle1) * l1
+      }
+    };
+  }
+
+  // Exact center-rotation translation compensation
+  function getRotatedBoneBounds(jointX, jointY, length, height, angleDeg) {
+    const rad = toRad(angleDeg);
+    const halfL = length / 2;
+    const halfH = height / 2;
+    const centerX = jointX + halfL * Math.cos(rad);
+    const centerY = jointY + halfL * Math.sin(rad);
+
+    return {
+      left: round2(centerX - halfL),
+      top: round2(centerY - halfH),
+      rotation: round2(angleDeg)
+    };
+  }
+
+  // Hermite Spline Evaluator for Aerial Drone Flight
+  function evaluateDronePath(t01) {
+    const pts = CONFIG.drone.path;
+    for (let i = 0; i < pts.length - 1; i++) {
+      const p1 = pts[i];
+      const p2 = pts[i + 1];
+      if (t01 >= p1.t && t01 <= p2.t) {
+        const u = (t01 - p1.t) / (p2.t - p1.t);
+        const easeU = u * u * (3 - 2 * u);
+        return {
+          x: p1.x + (p2.x - p1.x) * easeU,
+          y: p1.y + (p2.y - p1.y) * easeU,
+          bank: p1.bank + (p2.bank - p1.bank) * easeU
+        };
+      }
+    }
+    return pts[pts.length - 1];
+  }
+
+  // ==========================================================================
+  // 2. SCENE GRAPH BUILDER (CHARACTERS & COMBAT RIG ONLY)
+  // ==========================================================================
+  function buildCombatScene() {
+    const shapes = [];
+
+    // Mech Contact Shadow
+    shapes.push({
+      id: "mech_shadow",
+      name: "Mech_Ground_Shadow",
+      type: "circle",
+      bounds: { left: 0, top: CONFIG.mech.groundY + 3, width: 120, height: 18 },
+      fill: { color: "#020617" },
+      outline: { color: "transparent", weight: 0 }
+    });
+
+    // ------------------------------------------------------------------------
+    // MECH: FAR LEG (LEFT - Dark Slate Shading)
+    // ------------------------------------------------------------------------
+    shapes.push({ id: "mech_leg_L_thigh", name: "Mech_Leg_L_Thigh", type: "roundedRectangle", bounds: { left: 0, top: 0, width: CONFIG.mech.thighLen, height: 18 }, fill: { color: "#0f172a" }, outline: { color: "#0284c7", weight: 1.5 } });
+    shapes.push({ id: "mech_leg_L_knee",  name: "Mech_Leg_L_Knee",  type: "circle", bounds: { left: 0, top: 0, width: 20, height: 20 }, fill: { color: "#0284c7" }, outline: { color: "#ffffff", weight: 1 } });
+    shapes.push({ id: "mech_leg_L_shin",  name: "Mech_Leg_L_Shin",  type: "roundedRectangle", bounds: { left: 0, top: 0, width: CONFIG.mech.shinLen, height: 14 }, fill: { color: "#1e293b" }, outline: { color: "#0284c7", weight: 1.5 } });
+    shapes.push({ id: "mech_leg_L_foot",  name: "Mech_Leg_L_Foot",  type: "roundedRectangle", bounds: { left: 0, top: 0, width: 40, height: 12 }, fill: { color: "#0f172a" }, outline: { color: "#38bdf8", weight: 1.5 } });
+
+    // ------------------------------------------------------------------------
+    // MECH: TORSO, COCKPIT, WEAPONS & ENERGY SHIELD
+    // ------------------------------------------------------------------------
+    // Pelvis Saddle
+    shapes.push({
+      id: "mech_pelvis",
+      name: "Mech_Pelvis_Saddle",
+      type: "roundedRectangle",
+      bounds: { left: 0, top: 0, width: 34, height: 20 },
+      fill: { color: "#0f172a" },
+      outline: { color: "#f59e0b", weight: 2.5 }
+    });
+
+    // Armored Cockpit Hull (Turret)
+    shapes.push({
+      id: "mech_hull",
+      name: "Mech_Armored_Hull",
+      type: "roundedRectangle",
+      bounds: { left: 0, top: 0, width: 84, height: 46 },
+      fill: { color: "#1e293b" },
+      outline: { color: "#f59e0b", weight: 3 }
+    });
+
+    // Scanner Eye
+    shapes.push({
+      id: "mech_eye",
+      name: "Mech_Tactical_Scanner",
+      type: "roundedRectangle",
+      bounds: { left: 0, top: 0, width: 16, height: 6 },
+      fill: { color: "#ef4444" },
+      outline: { color: "#ffffff", weight: 1 }
+    });
+
+    // Left Shoulder Energy Shield Barrier (Hex Shield)
+    shapes.push({
+      id: "mech_shield_barrier",
+      name: "Hex_Energy_Shield_Barrier",
+      type: "circle",
+      bounds: { left: 0, top: 0, width: 68, height: 84 },
+      fill: { color: "#082f49" },
+      outline: { color: "#38bdf8", weight: 2.5 }
+    });
+
+    // Shield Deflection Sparks
+    shapes.push({
+      id: "shield_sparks",
+      name: "Shield_Deflection_Sparks",
+      type: "circle",
+      bounds: { left: 0, top: 0, width: 22, height: 22 },
+      fill: { color: "#ffffff" },
+      outline: { color: "#f59e0b", weight: 2 }
+    });
+
+    // Shoulder Missile Pod
+    shapes.push({
+      id: "mech_missile_pod",
+      name: "Shoulder_Missile_Pod",
+      type: "roundedRectangle",
+      bounds: { left: 0, top: 0, width: 30, height: 24 },
+      fill: { color: "#0f172a" },
+      outline: { color: "#f59e0b", weight: 2 }
+    });
+
+    // Guided Homing Missile
+    shapes.push({
+      id: "guided_missile",
+      name: "Homing_Guided_Missile",
+      type: "roundedRectangle",
+      bounds: { left: 0, top: 0, width: 18, height: 6 },
+      fill: { color: "#ef4444" },
+      outline: { color: "#ffffff", weight: 1 }
+    });
+
+    // Right Arm Heavy Autocannon Barrel (Dynamic LookAt Tracking)
+    shapes.push({
+      id: "mech_cannon",
+      name: "Heavy_Autocannon_Barrel",
+      type: "roundedRectangle",
+      bounds: { left: 0, top: 0, width: CONFIG.mech.cannonLen, height: 16 },
+      fill: { color: "#0f172a" },
+      outline: { color: "#38bdf8", weight: 2 }
+    });
+
+    shapes.push({
+      id: "mech_cannon_hub",
+      name: "Cannon_Shoulder_Hub",
+      type: "circle",
+      bounds: { left: 0, top: 0, width: 20, height: 20 },
+      fill: { color: "#1e293b" },
+      outline: { color: "#ffffff", weight: 1.5 }
+    });
+
+    // Muzzle Flash
+    shapes.push({
+      id: "mech_muzzle_flash",
+      name: "Autocannon_Muzzle_Flash",
+      type: "roundedRectangle",
+      bounds: { left: 0, top: 0, width: 26, height: 18 },
+      fill: { color: "#fef08a" },
+      outline: { color: "#f59e0b", weight: 2 }
+    });
+
+    // ------------------------------------------------------------------------
+    // MECH: NEAR LEG (RIGHT - High-Visibility Amber)
+    // ------------------------------------------------------------------------
+    shapes.push({ id: "mech_leg_R_thigh", name: "Mech_Leg_R_Thigh", type: "roundedRectangle", bounds: { left: 0, top: 0, width: CONFIG.mech.thighLen, height: 18 }, fill: { color: "#78350f" }, outline: { color: "#f59e0b", weight: 2 } });
+    shapes.push({ id: "mech_leg_R_knee",  name: "Mech_Leg_R_Knee",  type: "circle", bounds: { left: 0, top: 0, width: 22, height: 22 }, fill: { color: "#0f172a" }, outline: { color: "#ffffff", weight: 2 } });
+    shapes.push({ id: "mech_leg_R_shin",  name: "Mech_Leg_R_Shin",  type: "roundedRectangle", bounds: { left: 0, top: 0, width: CONFIG.mech.shinLen, height: 14 }, fill: { color: "#1e293b" }, outline: { color: "#f59e0b", weight: 2 } });
+    shapes.push({ id: "mech_leg_R_foot",  name: "Mech_Leg_R_Foot",  type: "roundedRectangle", bounds: { left: 0, top: 0, width: 42, height: 14 }, fill: { color: "#f59e0b" }, outline: { color: "#ffffff", weight: 1.5 } });
+
+    // ------------------------------------------------------------------------
+    // CYBER COMBAT DRONE (VIPER-DRONE)
+    // ------------------------------------------------------------------------
+    // Drone Main Stealth Fuselage
+    shapes.push({
+      id: "drone_fuselage",
+      name: "Viper_Drone_Fuselage",
+      type: "roundedRectangle",
+      bounds: { left: 0, top: 0, width: CONFIG.drone.width, height: CONFIG.drone.height },
+      fill: { color: "#0f172a" },
+      outline: { color: "#06b6d4", weight: 2.5 }
+    });
+
+    // Drone Cockpit Visor / Optic Sensor
+    shapes.push({
+      id: "drone_visor",
+      name: "Drone_Optic_Sensor",
+      type: "circle",
+      bounds: { left: 0, top: 0, width: 10, height: 10 },
+      fill: { color: "#ef4444" },
+      outline: { color: "#ffffff", weight: 1 }
+    });
+
+    // Drone Twin Jet Thruster Flames
+    shapes.push({
+      id: "drone_thruster_L",
+      name: "Drone_Thruster_Left",
+      type: "roundedRectangle",
+      bounds: { left: 0, top: 0, width: 14, height: 6 },
+      fill: { color: "#38bdf8" },
+      outline: { color: "#ffffff", weight: 1 }
+    });
+    shapes.push({
+      id: "drone_thruster_R",
+      name: "Drone_Thruster_Right",
+      type: "roundedRectangle",
+      bounds: { left: 0, top: 0, width: 14, height: 6 },
+      fill: { color: "#38bdf8" },
+      outline: { color: "#ffffff", weight: 1 }
+    });
+
+    // Drone Twin Attack Lasers (Strafe Beams)
+    shapes.push({
+      id: "drone_laser_beam",
+      name: "Drone_Plasma_Laser_Beam",
+      type: "rectangle",
+      bounds: { left: 0, top: 0, width: 140, height: 3 },
+      fill: { color: "#ef4444" },
+      outline: { color: "#ffffff", weight: 1 }
+    });
+
+    // Drone Countermeasure Flare
+    shapes.push({
+      id: "drone_flare",
+      name: "Drone_Countermeasure_Flare",
+      type: "circle",
+      bounds: { left: 0, top: 0, width: 16, height: 16 },
+      fill: { color: "#fef08a" },
+      outline: { color: "#f59e0b", weight: 2 }
+    });
+
+    return shapes;
+  }
+
+  // ==========================================================================
+  // 3. COMBAT ENCOUNTER EVALUATOR (CHARACTERS & KINEMATICS)
+  // ==========================================================================
+  function generateCombatTimeline(ids) {
+    const layers = [];
+    const makeTrack = (propertyKind, keyframes) => ({ propertyKind, durationSeconds: CONFIG.duration, keyframes });
+
+    // Mech Buffers
+    const pelvisX = [], pelvisY = [], pelvisRot = [];
+    const hullX = [], hullY = [], hullRot = [];
+    const eyeX = [], eyeY = [];
+    const podX = [], podY = [], podRot = [];
+    const cannonX = [], cannonY = [], cannonRot = [];
+    const cannonHubX = [], cannonHubY = [];
+    const flashX = [], flashY = [], flashScale = [], flashOpacity = [];
+    const shieldX = [], shieldY = [], shieldScale = [], shieldOpacity = [];
+    const sparksX = [], sparksY = [], sparksScale = [], sparksOpacity = [];
+    const missileX = [], missileY = [], missileRot = [], missileOpacity = [];
+
+    // Mech Legs
+    const legL = { thX: [], thY: [], thRot: [], kneeX: [], kneeY: [], shX: [], shY: [], shRot: [], ftX: [], ftY: [], ftRot: [] };
+    const legR = { thX: [], thY: [], thRot: [], kneeX: [], kneeY: [], shX: [], shY: [], shRot: [], ftX: [], ftY: [], ftRot: [] };
+    const shadowX = [], shadowY = [], shadowScaleX = [];
+
+    // Drone Buffers
+    const droneFusX = [], droneFusY = [], droneFusRot = [];
+    const droneVisX = [], droneVisY = [];
+    const thrustLX = [], thrustLY = [], thrustRX = [], thrustRY = [];
+    const laserX = [], laserY = [], laserRot = [], laserScaleX = [], laserOpacity = [];
+    const flareX = [], flareY = [], flareScale = [], flareOpacity = [];
+
+    // Mech Foot Stance Solver
+    function getMechFootTrajectory(phaseAngle, rootHipX) {
+      const pNorm = (phaseAngle % (Math.PI * 2) + Math.PI * 2) % (Math.PI * 2);
+      const u = pNorm / (Math.PI * 2);
+      let fx, fy, fRot;
+
+      if (u <= 0.5) {
+        const stanceT = u / 0.5;
+        fx = rootHipX + 42 * (0.5 - stanceT);
+        fy = CONFIG.mech.groundY;
+        fRot = stanceT < 0.15 ? -14 * (1 - stanceT / 0.15) : (stanceT > 0.70 ? 20 * ((stanceT - 0.70) / 0.30) : 0);
+      } else {
+        const swingT = (u - 0.5) / 0.5;
+        fx = rootHipX + (-0.5 + Math.sin(swingT * Math.PI * 0.5)) * 42;
+        fy = CONFIG.mech.groundY - Math.sin(swingT * Math.PI) * 22;
+        fRot = swingT < 0.4 ? 18 * (1 - swingT / 0.4) : -4;
+      }
+      return { x: fx, y: fy, rot: fRot };
+    }
+
+    for (let f = 0; f <= totalFrames; f++) {
+      const t = f / totalFrames;
+      const walkPhase = t * 2 * Math.PI * 2; // 2 heavy forward strides
+
+      // ----------------------------------------------------------------------
+      // STEP 1: EVALUATE DRONE FLIGHT TRAJECTORY (BEHAVIOR STATE MACHINE)
+      // ----------------------------------------------------------------------
+      const dronePose = evaluateDronePath(t);
+      const droneRad = toRad(dronePose.bank);
+
+      droneFusX.push({ normalizedTime: t, value: { number: round2(dronePose.x - CONFIG.drone.width / 2) } });
+      droneFusY.push({ normalizedTime: t, value: { number: round2(dronePose.y - CONFIG.drone.height / 2) } });
+      droneFusRot.push({ normalizedTime: t, value: { number: round2(dronePose.bank) } });
+
+      // Drone Optic Sensor
+      const visOffset = -CONFIG.drone.width / 2 + 6;
+      droneVisX.push({ normalizedTime: t, value: { number: round2(dronePose.x + Math.cos(droneRad) * visOffset - 5) } });
+      droneVisY.push({ normalizedTime: t, value: { number: round2(dronePose.y + Math.sin(droneRad) * visOffset - 5) } });
+
+      // Thrusters
+      thrustLX.push({ normalizedTime: t, value: { number: round2(dronePose.x + 14) } });
+      thrustLY.push({ normalizedTime: t, value: { number: round2(dronePose.y - 8) } });
+      thrustRX.push({ normalizedTime: t, value: { number: round2(dronePose.x + 14) } });
+      thrustRY.push({ normalizedTime: t, value: { number: round2(dronePose.y + 4) } });
+
+      // ----------------------------------------------------------------------
+      // STEP 2: MECH KINEMATICS & DYNAMIC LOOK-AT AUTOCANNON TRACKING
+      // ----------------------------------------------------------------------
+      const currentX = (t < 0.6)
+        ? CONFIG.mech.startX + (t / 0.6) * (CONFIG.mech.endX - CONFIG.mech.startX)
+        : CONFIG.mech.endX; // Holds combat stance
+
+      const bounceY = (t < 0.6) ? -Math.sin(walkPhase * 2) * 5.0 : 0;
+      const currentHipY = CONFIG.mech.pelvisBaseY + bounceY;
+
+      // Pelvis & Hull
+      pelvisX.push({ normalizedTime: t, value: { number: round2(currentX - 17) } });
+      pelvisY.push({ normalizedTime: t, value: { number: round2(currentHipY - 10) } });
+      pelvisRot.push({ normalizedTime: t, value: { number: round2((t < 0.6) ? Math.sin(walkPhase) * 3 : 0) } });
+
+      const hullCenterY = currentHipY - 40;
+      hullX.push({ normalizedTime: t, value: { number: round2(currentX - 42) } });
+      hullY.push({ normalizedTime: t, value: { number: round2(hullCenterY - 23) } });
+      hullRot.push({ normalizedTime: t, value: { number: 0 } });
+
+      eyeX.push({ normalizedTime: t, value: { number: round2(currentX + 14) } });
+      eyeY.push({ normalizedTime: t, value: { number: round2(hullCenterY - 6) } });
+
+      // Missile Pod
+      podX.push({ normalizedTime: t, value: { number: round2(currentX - 36) } });
+      podY.push({ normalizedTime: t, value: { number: round2(hullCenterY - 26) } });
+      podRot.push({ normalizedTime: t, value: { number: -18 } }); // Tilted upward
+
+      // Autocannon solves continuous LookAt(dronePose)
+      const cannonPivotX = currentX + 16;
+      const cannonPivotY = hullCenterY + 4;
+      const aimDx = dronePose.x - cannonPivotX;
+      const aimDy = dronePose.y - cannonPivotY;
+      const aimAngleDeg = toDeg(Math.atan2(aimDy, aimDx));
+
+      cannonHubX.push({ normalizedTime: t, value: { number: round2(cannonPivotX - 10) } });
+      cannonHubY.push({ normalizedTime: t, value: { number: round2(cannonPivotY - 10) } });
+
+      // Mech fires flak burst at t = [0.55, 0.70]
+      let isMechFiring = (t >= 0.55 && t <= 0.70);
+      let cannonRecoil = isMechFiring ? -Math.abs(Math.sin((t - 0.55) * Math.PI * 26)) * 12 : 0;
+
+      const cb = getRotatedBoneBounds(cannonPivotX + cannonRecoil, cannonPivotY, CONFIG.mech.cannonLen, 16, aimAngleDeg);
+      cannonX.push({ normalizedTime: t, value: { number: cb.left } });
+      cannonY.push({ normalizedTime: t, value: { number: cb.top } });
+      cannonRot.push({ normalizedTime: t, value: { number: cb.rotation } });
+
+      // Muzzle Flash
+      const muzzleTipX = cannonPivotX + Math.cos(toRad(aimAngleDeg)) * CONFIG.mech.cannonLen;
+      const muzzleTipY = cannonPivotY + Math.sin(toRad(aimAngleDeg)) * CONFIG.mech.cannonLen;
+      flashX.push({ normalizedTime: t, value: { number: round2(muzzleTipX - 13) } });
+      flashY.push({ normalizedTime: t, value: { number: round2(muzzleTipY - 9) } });
+      flashScale.push({ normalizedTime: t, value: { number: isMechFiring ? 1.4 : 0.0 } });
+      flashOpacity.push({ normalizedTime: t, value: { number: isMechFiring ? 1.0 : 0.0 } });
+
+      // ----------------------------------------------------------------------
+      // STEP 3: DRONE LASER STRAFE & MECH ENERGY SHIELD INTERACTION
+      // ----------------------------------------------------------------------
+      const isDroneFiring = (t >= 0.32 && t <= 0.48);
+      const shieldCenterPos = { x: currentX + 38, y: hullCenterY - 6 };
+
+      // Drone Laser Beam targets Shield
+      const laserDx = shieldCenterPos.x - dronePose.x;
+      const laserDy = shieldCenterPos.y - dronePose.y;
+      const laserDist = Math.hypot(laserDx, laserDy);
+      const laserAngle = toDeg(Math.atan2(laserDy, laserDx));
+
+      laserX.push({ normalizedTime: t, value: { number: round2((dronePose.x + shieldCenterPos.x) / 2 - 70) } });
+      laserY.push({ normalizedTime: t, value: { number: round2((dronePose.y + shieldCenterPos.y) / 2 - 1.5) } });
+      laserRot.push({ normalizedTime: t, value: { number: round2(laserAngle) } });
+      laserScaleX.push({ normalizedTime: t, value: { number: round2(laserDist / 140) } });
+      laserOpacity.push({ normalizedTime: t, value: { number: isDroneFiring ? 1.0 : 0.0 } });
+
+      // Shield Deploys during Drone Fire
+      const isShieldActive = (t >= 0.30 && t <= 0.52);
+      shieldX.push({ normalizedTime: t, value: { number: round2(shieldCenterPos.x - 34) } });
+      shieldY.push({ normalizedTime: t, value: { number: round2(shieldCenterPos.y - 42) } });
+      shieldScale.push({ normalizedTime: t, value: { number: isShieldActive ? 1.2 + Math.sin(t * Math.PI * 30) * 0.1 : 0.0 } });
+      shieldOpacity.push({ normalizedTime: t, value: { number: isShieldActive ? 0.9 : 0.0 } });
+
+      // Shield Deflection Sparks
+      sparksX.push({ normalizedTime: t, value: { number: round2(shieldCenterPos.x - 11) } });
+      sparksY.push({ normalizedTime: t, value: { number: round2(shieldCenterPos.y - 11) } });
+      sparksScale.push({ normalizedTime: t, value: { number: isDroneFiring ? 1.3 + Math.sin(t * Math.PI * 40) * 0.3 : 0.0 } });
+      sparksOpacity.push({ normalizedTime: t, value: { number: isDroneFiring ? 1.0 : 0.0 } });
+
+      // ----------------------------------------------------------------------
+      // STEP 4: GUIDED MISSILE LAUNCH & DRONE FLARES
+      // ----------------------------------------------------------------------
+      let mX = currentX - 30, mY = hullCenterY - 26, mRot = -45, mOp = 0;
+      if (t >= 0.75) {
+        const u = (t - 0.75) / 0.25;
+        mOp = 1.0;
+        mX = (currentX - 30) + u * (dronePose.x - (currentX - 30));
+        mY = (hullCenterY - 26) + u * (dronePose.y - (hullCenterY - 26)) - Math.sin(u * Math.PI) * 40;
+        mRot = toDeg(Math.atan2(dronePose.y - mY, dronePose.x - mX));
+      }
+      missileX.push({ normalizedTime: t, value: { number: round2(mX - 9) } });
+      missileY.push({ normalizedTime: t, value: { number: round2(mY - 3) } });
+      missileRot.push({ normalizedTime: t, value: { number: round2(mRot) } });
+      missileOpacity.push({ normalizedTime: t, value: { number: mOp } });
+
+      // Drone Countermeasure Flare (t = 0.80 -> 0.95)
+      const isFlare = (t >= 0.80 && t <= 0.95);
+      flareX.push({ normalizedTime: t, value: { number: round2(dronePose.x + 20) } });
+      flareY.push({ normalizedTime: t, value: { number: round2(dronePose.y + 10) } });
+      flareScale.push({ normalizedTime: t, value: { number: isFlare ? 1.4 : 0.0 } });
+      flareOpacity.push({ normalizedTime: t, value: { number: isFlare ? 0.9 : 0.0 } });
+
+      // ----------------------------------------------------------------------
+      // STEP 5: MECH DIGITIGRADE LEGS & SHADOW
+      // ----------------------------------------------------------------------
+      const footFar = getMechFootTrajectory(walkPhase + Math.PI, currentX);
+      const ikFar = solveReverseLegIK({ x: currentX, y: currentHipY }, footFar, CONFIG.mech.thighLen, CONFIG.mech.shinLen);
+      const thFb = getRotatedBoneBounds(currentX, currentHipY, CONFIG.mech.thighLen, 18, ikFar.thighAngleDeg);
+      legL.thX.push({ normalizedTime: t, value: { number: thFb.left } });
+      legL.thY.push({ normalizedTime: t, value: { number: thFb.top } });
+      legL.thRot.push({ normalizedTime: t, value: { number: thFb.rotation } });
+      legL.kneeX.push({ normalizedTime: t, value: { number: round2(ikFar.kneePos.x - 10) } });
+      legL.kneeY.push({ normalizedTime: t, value: { number: round2(ikFar.kneePos.y - 10) } });
+      const shFb = getRotatedBoneBounds(ikFar.kneePos.x, ikFar.kneePos.y, CONFIG.mech.shinLen, 14, ikFar.shinAngleDeg);
+      legL.shX.push({ normalizedTime: t, value: { number: shFb.left } });
+      legL.shY.push({ normalizedTime: t, value: { number: shFb.top } });
+      legL.shRot.push({ normalizedTime: t, value: { number: shFb.rotation } });
+      const ftFb = getRotatedBoneBounds(footFar.x - 12, footFar.y, 40, 12, footFar.rot);
+      legL.ftX.push({ normalizedTime: t, value: { number: ftFb.left } });
+      legL.ftY.push({ normalizedTime: t, value: { number: ftFb.top } });
+      legL.ftRot.push({ normalizedTime: t, value: { number: ftFb.rotation } });
+
+      const footNear = getMechFootTrajectory(walkPhase, currentX);
+      const ikNear = solveReverseLegIK({ x: currentX, y: currentHipY }, footNear, CONFIG.mech.thighLen, CONFIG.mech.shinLen);
+      const thNb = getRotatedBoneBounds(currentX, currentHipY, CONFIG.mech.thighLen, 18, ikNear.thighAngleDeg);
+      legR.thX.push({ normalizedTime: t, value: { number: thNb.left } });
+      legR.thY.push({ normalizedTime: t, value: { number: thNb.top } });
+      legR.thRot.push({ normalizedTime: t, value: { number: thNb.rotation } });
+      legR.kneeX.push({ normalizedTime: t, value: { number: round2(ikNear.kneePos.x - 11) } });
+      legR.kneeY.push({ normalizedTime: t, value: { number: round2(ikNear.kneePos.y - 11) } });
+      const shNb = getRotatedBoneBounds(ikNear.kneePos.x, ikNear.kneePos.y, CONFIG.mech.shinLen, 14, ikNear.shinAngleDeg);
+      legR.shX.push({ normalizedTime: t, value: { number: shNb.left } });
+      legR.shY.push({ normalizedTime: t, value: { number: shNb.top } });
+      legR.shRot.push({ normalizedTime: t, value: { number: shNb.rotation } });
+      const ftNb = getRotatedBoneBounds(footNear.x - 12, footNear.y, 42, 14, footNear.rot);
+      legR.ftX.push({ normalizedTime: t, value: { number: ftNb.left } });
+      legR.ftY.push({ normalizedTime: t, value: { number: ftNb.top } });
+      legR.ftRot.push({ normalizedTime: t, value: { number: ftNb.rotation } });
+
+      shadowX.push({ normalizedTime: t, value: { number: round2(currentX - 60) } });
+      shadowY.push({ normalizedTime: t, value: { number: CONFIG.mech.groundY + 3 } });
+      shadowScaleX.push({ normalizedTime: t, value: { number: round2(1.0 - bounceY / 16) } });
+    }
+
+    // ========================================================================
+    // BIND CHARACTER LAYERS TO RUNTIME NODES
+    // ========================================================================
+    // 1. Mech Far Leg
+    layers.push({ runtimeNodeId: ids.get("mech_leg_L_thigh"), properties: [makeTrack("PositionX", legL.thX), makeTrack("PositionY", legL.thY), makeTrack("Rotation", legL.thRot)] });
+    layers.push({ runtimeNodeId: ids.get("mech_leg_L_knee"),  properties: [makeTrack("PositionX", legL.kneeX), makeTrack("PositionY", legL.kneeY)] });
+    layers.push({ runtimeNodeId: ids.get("mech_leg_L_shin"),  properties: [makeTrack("PositionX", legL.shX), makeTrack("PositionY", legL.shY), makeTrack("Rotation", legL.shRot)] });
+    layers.push({ runtimeNodeId: ids.get("mech_leg_L_foot"),  properties: [makeTrack("PositionX", legL.ftX), makeTrack("PositionY", legL.ftY), makeTrack("Rotation", legL.ftRot)] });
+
+    // 2. Mech Torso, Weapons, Shield
+    layers.push({ runtimeNodeId: ids.get("mech_shadow"),         properties: [makeTrack("PositionX", shadowX), makeTrack("PositionY", shadowY), makeTrack("ScaleX", shadowScaleX)] });
+    layers.push({ runtimeNodeId: ids.get("mech_pelvis"),         properties: [makeTrack("PositionX", pelvisX), makeTrack("PositionY", pelvisY), makeTrack("Rotation", pelvisRot)] });
+    layers.push({ runtimeNodeId: ids.get("mech_hull"),           properties: [makeTrack("PositionX", hullX), makeTrack("PositionY", hullY), makeTrack("Rotation", hullRot)] });
+    layers.push({ runtimeNodeId: ids.get("mech_eye"),            properties: [makeTrack("PositionX", eyeX), makeTrack("PositionY", eyeY)] });
+    layers.push({ runtimeNodeId: ids.get("mech_missile_pod"),    properties: [makeTrack("PositionX", podX), makeTrack("PositionY", podY), makeTrack("Rotation", podRot)] });
+    layers.push({ runtimeNodeId: ids.get("guided_missile"),      properties: [makeTrack("PositionX", missileX), makeTrack("PositionY", missileY), makeTrack("Rotation", missileRot), makeTrack("Opacity", missileOpacity)] });
+    layers.push({ runtimeNodeId: ids.get("mech_cannon"),         properties: [makeTrack("PositionX", cannonX), makeTrack("PositionY", cannonY), makeTrack("Rotation", cannonRot)] });
+    layers.push({ runtimeNodeId: ids.get("mech_cannon_hub"),     properties: [makeTrack("PositionX", cannonHubX), makeTrack("PositionY", cannonHubY)] });
+    layers.push({ runtimeNodeId: ids.get("mech_muzzle_flash"),   properties: [makeTrack("PositionX", flashX), makeTrack("PositionY", flashY), makeTrack("ScaleX", flashScale), makeTrack("ScaleY", flashScale), makeTrack("Opacity", flashOpacity)] });
+    layers.push({ runtimeNodeId: ids.get("mech_shield_barrier"), properties: [makeTrack("PositionX", shieldX), makeTrack("PositionY", shieldY), makeTrack("ScaleX", shieldScale), makeTrack("ScaleY", shieldScale), makeTrack("Opacity", shieldOpacity)] });
+    layers.push({ runtimeNodeId: ids.get("shield_sparks"),       properties: [makeTrack("PositionX", sparksX), makeTrack("PositionY", sparksY), makeTrack("ScaleX", sparksScale), makeTrack("ScaleY", sparksScale), makeTrack("Opacity", sparksOpacity)] });
+
+    // 3. Mech Near Leg
+    layers.push({ runtimeNodeId: ids.get("mech_leg_R_thigh"), properties: [makeTrack("PositionX", legR.thX), makeTrack("PositionY", legR.thY), makeTrack("Rotation", legR.thRot)] });
+    layers.push({ runtimeNodeId: ids.get("mech_leg_R_knee"),  properties: [makeTrack("PositionX", legR.kneeX), makeTrack("PositionY", legR.kneeY)] });
+    layers.push({ runtimeNodeId: ids.get("mech_leg_R_shin"),  properties: [makeTrack("PositionX", legR.shX), makeTrack("PositionY", legR.shY), makeTrack("Rotation", legR.shRot)] });
+    layers.push({ runtimeNodeId: ids.get("mech_leg_R_foot"),  properties: [makeTrack("PositionX", legR.ftX), makeTrack("PositionY", legR.ftY), makeTrack("Rotation", legR.ftRot)] });
+
+    // 4. Drone Layers
+    layers.push({ runtimeNodeId: ids.get("drone_fuselage"),   properties: [makeTrack("PositionX", droneFusX), makeTrack("PositionY", droneFusY), makeTrack("Rotation", droneFusRot)] });
+    layers.push({ runtimeNodeId: ids.get("drone_visor"),      properties: [makeTrack("PositionX", droneVisX), makeTrack("PositionY", droneVisY)] });
+    layers.push({ runtimeNodeId: ids.get("drone_thruster_L"), properties: [makeTrack("PositionX", thrustLX), makeTrack("PositionY", thrustLY)] });
+    layers.push({ runtimeNodeId: ids.get("drone_thruster_R"), properties: [makeTrack("PositionX", thrustRX), makeTrack("PositionY", thrustRY)] });
+    layers.push({ runtimeNodeId: ids.get("drone_laser_beam"), properties: [makeTrack("PositionX", laserX), makeTrack("PositionY", laserY), makeTrack("Rotation", laserRot), makeTrack("ScaleX", laserScaleX), makeTrack("Opacity", laserOpacity)] });
+    layers.push({ runtimeNodeId: ids.get("drone_flare"),      properties: [makeTrack("PositionX", flareX), makeTrack("PositionY", flareY), makeTrack("ScaleX", flareScale), makeTrack("ScaleY", flareScale), makeTrack("Opacity", flareOpacity)] });
+
+    return layers;
+  }
+
+  // ==========================================================================
+  // 4. MAIN ORCHESTRATOR & SLIDESHOW BAKER
+  // ==========================================================================
+  window.runShowcase_ProjectClashBattle = async function runShowcase_ProjectClashBattle() {
+    console.log("%c⚔️ Assembling Character Rig: Goliath vs. Drone...", "color: #ef4444; font-weight: bold;");
+
+    try {
+      const shapes = buildCombatScene();
+      const buildResult = await sdk.scene.build({ clear: true, shapes });
+
+      if (!buildResult?.success) {
+        console.error("❌ Scene build failed:", buildResult);
+        return;
+      }
+
+      const idMap = new Map(buildResult.shapes.map((s) => [s.id, s.runtimeNodeId]));
+      console.log(`✨ %c${shapes.length} Character shapes spawned into scene!`, "color: #4ade80; font-weight: bold;");
+
+      console.log("📐 Evaluating Multi-Agent FSM Behaviors, LookAt Aiming, and Kinematics...");
+      const layers = generateCombatTimeline(idMap);
+
+      console.log("⚡ Baking Character Timeline into PowerPoint CustomXML Runtime...");
+      await sdk.timeline.bake({
+        label: "Project_Clash_Mech_vs_Drone_Characters",
+        clear: ["PositionX", "PositionY", "Rotation", "ScaleX", "ScaleY", "Opacity", "FillColor", "StrokeColor", "StrokeWeight"],
+        merge: false,
+        durationSeconds: CONFIG.duration,
+        layers
+      });
+
+      console.log(
+        "%c▶ PLAYING CHARACTER ANIMATION IN POWERPOINT",
+        "color: #22c55e; font-size: 16px; font-weight: bold;"
+      );
+
+      await sdk.timeline.play({ startTimeSeconds: 0 });
+    } catch (err) {
+      console.error("❌ Combat showcase failed:", err);
+    }
+  };
+
+  console.log("\n%c👇 RUN CHARACTER BATTLE BY TYPING:", "color: #ef4444; font-size: 13px; font-weight: bold;");
+  console.log("%crunShowcase_ProjectClashBattle()", "color: #22c55e; font-size: 15px; font-weight: bold;");
+})();
