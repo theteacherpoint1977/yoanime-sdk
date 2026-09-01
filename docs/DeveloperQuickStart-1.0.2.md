@@ -74,7 +74,64 @@ The full public package contract is `docs/ExtensionPackageContract-1.0.2.md`. Fo
 }
 ```
 
-## 4. Use The Stable SDK Path
+## 4. Use The Stable SDK Path — animation.* (higher-level)
+
+Preferred authoring for v0.5: `animation.create → preview → commit → timeline.play`.
+
+```js
+await yoanime.runtime.ready();
+
+const scene = await yoanime.scene.get({ includeGeometry: true });
+const first = scene.shapes[0];
+
+// 1) create  (host-minted animationId, ordered, versioned)
+const { animation } = await yoanime.animation.create({
+  label: "My Animation",
+  durationSeconds: 2,
+  layers: [
+    {
+      runtimeNodeId: first.runtimeNodeId,
+      properties: {
+        Rotation: {
+          keyframes: [
+            { normalizedTime: 0, value: { number: 0 } },
+            { normalizedTime: 1, value: { number: 360 } }
+          ]
+        }
+      }
+    }
+  ]
+});
+
+// Optional: inspect ordered list / single definition
+await yoanime.animation.list();                // → { animations: [{animationId, label, durationSeconds}] }
+await yoanime.animation.get(animation.animationId);
+
+// 2) preview  (ghost IR — no host mutation, no timelineVersion bump)
+const preview = await yoanime.animation.preview({ animationId: animation.animationId });
+console.log(preview.ir.layers.length);
+
+// 3) commit  (bake → timeline + history, bumps timelineVersion)
+await yoanime.animation.commit({ animationId: animation.animationId });
+
+// 4) play  (committed timeline — replay does NOT rerun procedural logic)
+yoanime.timeline.play({ startTimeSeconds: 0 });
+
+// Events: notification only — call getters for truth
+yoanime.animation.onChanged(e => console.log(e.sceneId, e.animationId, e.operation));
+
+// Undo / persistence (slot)
+await yoanime.animation.undo();
+await yoanime.animation.redo();
+await yoanime.animation.save({ animationId: animation.animationId, slot: "my-slot" });
+await yoanime.animation.load({ slot: "my-slot" });
+```
+
+Permissions: `animation.read` (list/get/preview/save/load/onChanged) and `timeline.write` (create/update/remove/reorder/commit). `animation.commit` internally calls `timeline.bake`.
+
+## 4b. Lower-level alternative — timeline.bake()
+
+Direct timeline authoring remains `@stable` for custom tracks:
 
 ```js
 await yoanime.runtime.ready();
@@ -101,6 +158,8 @@ yoanime.timeline.playFrom(0);
 ```
 
 > **For overlay extensions:** The code above works in the taskpane surface (top-level WebView2 with host-injected SDK). Overlay iframes require the [Overlay Bootstrap Standard](https://github.com/yoanime/yoanime-sdk/blob/main/reference/extension/docs/runtime/OverlayBootstrapStandard.md): load `yoAnimeBridge.js`, wait for `window.yoanime` via polling, then call `runtime.ready()`.
+
+> **Console scripts are developer samples/stress tests,** not the final end-user authoring UI. They live in `samples/console-scripts/` and validate the contracts; product extensions use taskpane/overlay UI that calls `animation.*` or `timeline.bake`.
 
 ## 5. Verify Before Sharing
 

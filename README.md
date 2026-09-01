@@ -14,15 +14,20 @@ audience:
 
 Build JavaScript/HTML extensions for PowerPoint motion, timelines, physics, procedural animation, and live web experiences.
 
-yoAnime Studio is a PowerPoint add-in that turns PowerPoint into a programmable creative platform. This repository contains the public SDK documentation, TypeScript definitions, extension package template, and sample extensions for the yoAnime `1.0.2.0` SDK/Extension Platform Preview.
+yoAnime Studio is a PowerPoint add-in that turns PowerPoint into a programmable creative platform. This repository contains the public SDK documentation, TypeScript definitions, extension package template, and sample extensions for the yoAnime **Platform v0.5.0** (SDK contract **v0.4.0**).
 
-> The yoAnime Studio application/runtime is proprietary. This repository contains public developer documentation, examples, and templates only.
+> The yoAnime Studio application/runtime is proprietary. This repository contains public developer documentation, examples, and templates only. The canonical contract is `types/yoanime-sdk.d.ts` — **34 namespaces / 213 callable members / 111 DTO types** (see `docs/YoAnimeSdkReference-0.5.0.md`). `v0.5.0` certifies `animation.*` preview on the `0.4.0` contract; see Versioning below.
 
 ## Product Status
 
-- yoAnime Studio `1.0.1.0` is available on the Microsoft Store.
-- yoAnime Studio `1.0.2.0` is in release hardening and introduces the SDK/Extension Platform Preview.
-- Public SDK bridge version: `0.3.0`.
+- yoAnime Studio `v0.5.0` is the current SDK/Extension Platform (GitHub tag `v0.5.0`). `v0.4.0-rc1/rc2` remain immutable history.
+- yoAnime Studio `1.0.1.0` is available on the Microsoft Store (store channel lags SDK).
+- Public SDK contract version: `0.4.0` (header in `types/yoanime-sdk.d.ts`). Platform release is `v0.5.0`.
+
+### Versioning
+
+* **Platform / Release:** `v0.5.0` — `animation.create → preview → commit → timeline` authoring model (see `MISSION-11P`).
+* **SDK contract:** `v0.4.0` — `types/yoanime-sdk.d.ts` (2,396 lines, additive `animation.*` preview). Use `yoanime.runtime.getCapabilities().sdkVersion` at runtime.
 
 Product link:
 [Microsoft Store](https://apps.microsoft.com/detail/9PP5T5LHG1JL?hl=en-us&gl=IN&ocid=pdpshare)
@@ -44,6 +49,25 @@ Extensions do not receive raw PowerPoint COM objects, native handles, or direct 
 
 ## Quick Example
 
+Higher-level (preferred) — `animation.*`:
+
+```js
+await yoanime.runtime.ready();
+const scene = await yoanime.scene.get({ includeGeometry: true });
+const first = scene.shapes[0];
+
+const { animation } = await yoanime.animation.create({
+  label: "My Animation",
+  durationSeconds: 2,
+  layers: [{ runtimeNodeId: first.runtimeNodeId, properties: { Rotation: { keyframes: [{ normalizedTime: 0, value: { number: 0 } }, { normalizedTime: 1, value: { number: 360 } }] } } }]
+});
+await yoanime.animation.preview({ animationId: animation.animationId }); // ghost IR — no host mutation
+await yoanime.animation.commit({ animationId: animation.animationId }); // bakes to timeline (timelineVersion++)
+yoanime.timeline.play({ startTimeSeconds: 0 });
+```
+
+Lower-level — `timeline.bake` (still stable):
+
 ```js
 await yoanime.runtime.ready();
 
@@ -64,12 +88,13 @@ await yoanime.motionProviders.bake("yoanime.noise.wiggle-position", {
 
 ## Start Here
 
-- [Developer Quick Start](docs/DeveloperQuickStart-1.0.2.md)
-- [SDK Reference](docs/YoAnimeSdkReference-1.0.2.md)
+- [Developer Quick Start](docs/DeveloperQuickStart-1.0.2.md) — now includes `animation.create → preview → commit → timeline.play`
+- [SDK Reference 0.5.0](docs/YoAnimeSdkReference-0.5.0.md) — current (supersedes `1.0.2`; 34 namespaces / 213 members / 111 DTOs, `animation.*` preview)
+- [Release Notes 0.5.0](docs/ReleaseNotes-0.5.0.md) — what is new in v0.5.0
 - [Extension Package Contract](docs/ExtensionPackageContract-1.0.2.md)
 - [Manifest Permissions](docs/SdkManifestV2Permissions.md)
 - [Packaging Workflow](docs/ExtensionPackagingWorkflow.md)
-- [Architecture Overview](docs/ArchitectureOverview.md)
+- [Architecture Overview](docs/ArchitectureOverview.md) — now with `animation.*` diagram
 - [Known Limitations](docs/KnownLimitations-1.0.2.md)
 - [Reference Extension Certification Suite](reference/extension/certification/README.md) — Release gate for all Reference Extension stages
 
@@ -87,13 +112,13 @@ media/                        screenshots and demo links
 
 ## SDK Stability
 
-yoAnime `1.0.2.0` classifies APIs as:
+yoAnime **Platform v0.5.0** (contract `0.4.0`) classifies APIs as:
 
-- `stable`: safe public APIs for this preview release
-- `preview`: powerful APIs available to trusted developers but subject to change
-- `internal`: host/runtime plumbing not intended for public extensions
+- `stable`: safe public APIs for this release (e.g., `runtime`, `selection`, `scene.get`, `timeline.get/bake/play`, `motionProviders.list/get/generate/bake`, `constraints`, `behavior`, `relationship`, `physics`, `paths`, `noise`)
+- `preview`: powerful APIs available to trusted developers but subject to change (e.g., `animation.*` 13 methods, `scene.build/mutateShape`, `timeline` editor APIs, `data`, `transforms`, `commands`, `dev`, `ik.solveChain`, `expressions.evaluate`)
+- `internal`: host/runtime plumbing not intended for public extensions (e.g., `trajectory`, `debug`, `expressions._parse/_eval`, `extensions.mount`)
 
-Use `yoanime.runtime.getCapabilities()` at runtime to inspect the current SDK version, permissions, and API stability groups.
+Use `yoanime.runtime.getCapabilities()` at runtime to inspect the current SDK version, permissions, and API stability groups. See `docs/YoAnimeSdkReference-0.5.0.md` for the full table.
 
 ## Core Platform Laws
 

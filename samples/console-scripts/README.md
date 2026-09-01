@@ -10,9 +10,9 @@ ai-priority: 5
 audience:
 - all
 ---
-# yoAnime SDK Samples 1.0.2
+# yoAnime SDK Samples — 0.5.0
 
-These scripts are copy-paste samples for extension consoles and starter pages. They use the stable `1.0.2.0` SDK path wherever possible.
+These scripts are **developer samples/stress tests** for extension consoles and starter pages — not the final end-user authoring UI (product extensions use taskpane/overlay UI that calls `animation.*` or `timeline.bake`). They use the current `0.5.0` (contract `0.4.0`) SDK path wherever possible.
 
 Run from a yoAnime WebView2 extension surface after the SDK is injected.
 
@@ -42,12 +42,18 @@ Legend: `[stable]` uses the conservative public `1.0.2.0` SDK path. `[preview]` 
 - `[preview]` `20-lottie-transform-provider.js`: uses the built-in Phase 101 Lottie transform extractor to generate and bake motion from tiny inline Lottie JSON.
 - `[preview]` `21-ai-motion-provider-contract.js`: exercises the Phase 102 vendor-neutral AI motion contract with deterministic local prompt motion.
 - `[preview]` `22-particle-system.js`: demonstrates `yoanime.scene.batchMutate()` for COM-safe batch mutation and `timeline.bake()` for keyframe persistence.
+- `[stable]` `22-lumen-jelly-fish.js`: Lumen jelly-fish cinematic demo (published at v0.5.0).
+- `[preview]` `23-orbit-motion.js`: orbit motion generator sample.
+- `[preview]` `24-spiral-motion.js`: spiral motion generator sample.
+- `[preview]` `25-noise-motion.js`: noise motion generator sample.
+- `[preview]` `26-spring-motion.js`: spring motion generator sample.
+- Demo cinematic: `Project GOLIATH vs. CYBER-DRONE.txt` and `Project GOLIATH vs. CYBER-DRONE Transparent.txt` — 12-second battle cinematic (mech vs drone, `scene.build → animation`/`timeline` → `timeline.play`, 30 FPS) — present on GitHub `main` (`588ec97`), now included locally after sync.
 - `[preview]` `developer-sample-pack/`: Phase 103 installable extension examples for provider packs, runtime channels, Web Surface events, data sources, Lottie, AI motion, and particle systems.
 - `[stable]` `extension-package-template/`: minimal installable taskpane plus overlay package.
 
 ## Package Contract
 
-Use `docs/ExtensionPackageContract-1.0.2.md` as the public manifest and packaging authority for yoAnime `1.0.2.0`.
+Use `docs/ExtensionPackageContract-1.0.2.md` as the public manifest and packaging authority. For v0.5.0 authoring, see also `docs/YoAnimeSdkReference-0.5.0.md` (`animation.*` preview) and `docs/ReleaseNotes-0.5.0.md`.
 
 ## Stable Rule
 

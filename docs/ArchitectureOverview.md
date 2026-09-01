@@ -41,16 +41,37 @@ Taskpane and overlay pages communicate through SDK messaging or runtime channels
 
 ## Motion And Timeline
 
-Extensions author motion in slide-point coordinates. The recommended public mutation path is `timeline.bake()`, which sends a complete animation request to the host.
+Extensions author motion in slide-point coordinates. There are two complementary authoring levels:
 
-Procedural engines can generate motion through providers:
+* **Higher-level (preferred): `animation.*`** — a versioned, ordered, host-minted authoring model:
+  ```text
+  procedural / extension logic
+          ↓
+  animation.create({ label, durationSeconds, layers:[{runtimeNodeId, properties:{PositionX:{keyframes:[{normalizedTime, value:{number}}]}}}], metadata })
+          ↓
+  animation.preview({animationId})  →  ghost Generated Motion IR (no host mutation, no timelineVersion bump)
+          ↓
+  animation.commit({animationId})  →  Timeline Bake Request  →  PropertyTrackMutationService.BakePropertyTracksAsync  →  timelineVersion++
+          ↓
+  timeline.play({startTimeSeconds:0})  →  PowerPoint
+  ```
+  `animation.list/get/update/remove/reorder` manage an ordered scene list (host-minted `animationId`, `version`), `onChanged` notifies (`{sceneId, animationId, operation}`), and `save/load/undo/redo` provide slot persistence and history. Replay is **committed timeline playback** — it does not rerun procedural logic. Requires `animation.read` (list/get/preview/save/load/onChanged) and `timeline.write` (create/update/remove/reorder/commit).
+
+* **Lower-level (direct): `timeline.bake()`** — sends a complete `TimelineBakeRequest` (`layers:[{runtimeNodeId, properties:{Kind:{keyframes}}}]`) directly to the host. Still `@stable` and fully supported for custom tracks; `animation.commit` internally calls this path.
+
+Procedural engines can generate motion through providers before either authoring entry:
 
 ```text
-Physics / Noise / Constraints / Paths / Lottie / AI
-  -> Generated Motion IR
-  -> Timeline Bake Request
-  -> PowerPoint Shapes
+Physics / Noise / Constraints / Paths / Lottie / AI / Data / IK / Expressions
+  -> Generated Motion IR (diagnostics, seed, requirements, preview hints)
+  -> Timeline Bake Request  (via motionProviders.generate→bake or animation layers)
+  -> animation.commit  OR  timeline.bake
+  -> PowerPoint Shapes (slide-point PositionX/Y, Rotation degrees, Scale ratio)
 ```
+
+## Animation Runtime
+
+`animation.*` does **not** replace the timeline runtime and does **not** automatically perform physics or IK. Physics/IK are provider helpers (`yoanime.physics.*`, `yoanime.ik.*`) that must be explicitly composed into `animation.layers[].motionProvider` or baked via `motionProviders`. See `YoAnimeSdkReference-0.5.0.md` → `animation`.
 
 ## Live Web Experiences
 
@@ -58,7 +79,7 @@ yoAnime can render live web experiences inside PowerPoint slides. Web content is
 
 ## Permissions
 
-Extension manifests declare permissions such as `selection.read`, `scene.read`, `timeline.write`, `interaction.write`, and `surface.messaging`. The host gateway enforces permissions at runtime.
+Extension manifests declare permissions such as `animation.read`, `animation.write`, `selection.read`, `scene.read`, `timeline.read`, `timeline.write`, `timeline.playback`, `scene.write`, `shapes.write`, `interaction.write`, and `surface.messaging`. `animation.*` reuses `timeline.write` for create/update/remove/reorder/commit (plus `animation.read` for list/get/preview). The host gateway enforces permissions at runtime.
 
 ---
 
