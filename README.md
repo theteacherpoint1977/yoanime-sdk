@@ -93,7 +93,7 @@ await yoanime.motionProviders.bake("yoanime.noise.wiggle-position", {
 - [SDK Reference 0.5.0](docs/YoAnimeSdkReference-0.5.0.md) — current public reference (34 namespaces / 213 callable members / 111 DTOs); `animation.*` is preview
 - [Release Notes 0.5.0](docs/ReleaseNotes-0.5.0.md) — platform changes and known exceptions
 - [Extension Package Contract](docs/ExtensionPackageContract-1.0.2.md) — historical contract document; check the SDK reference and installed host capabilities for current API status
-- [Manifest Permissions](docs/SdkManifestV2Permissions.md)
+- [Manifest Permissions](docs/SdkManifestV2Permissions.md) — 1.0.2-era permission baseline; cross-check v0.5.0 API stability in the current SDK reference
 - [Packaging Workflow](docs/ExtensionPackagingWorkflow.md)
 - [Architecture Overview](docs/ArchitectureOverview.md)
 - [Known Limitations](docs/KnownLimitations-1.0.2.md) — historical 1.0.2 document; not a complete v0.5.0 release matrix
