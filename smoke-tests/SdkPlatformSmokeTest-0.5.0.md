@@ -43,10 +43,10 @@ console.log(await yoanime.runtime.getCapabilities());
 
 Expected:
 
-- `sdkVersion` is `0.4.0` (contract) and `hostVersion` matches Platform `0.5.0`.
+- `sdkVersion` reports contract `0.4.0` for a v0.5.0-compatible SDK host. `hostVersion` reports the installed yoAnime host/application version; record its actual value separately. Do not confuse the SDK platform tag `v0.5.0` with the app's host version, and do not infer the Store-delivered version from a development build.
 - `platformLaws` includes `browser-intent-only`, `wpf-runtime-authority`, `vsto-com-authority`, and `runtime-node-id-authority`.
-- `apiStability.stable` includes `timeline.bake`, `slide`, `geometry`, `physics`, `animation` is `preview` (13 methods).
-- `apiStability.preview` includes `animation.*`; `internal` includes `trajectory` and extension lifecycle controls.
+- `apiStability.stable` includes `timeline.bake`, `slide`, `geometry`, and the documented stable physics helpers.
+- `apiStability.preview` includes `animation.*` (13 methods); `internal` includes `trajectory` and extension lifecycle controls.
 
 ## Scene And Slide Geometry
 
