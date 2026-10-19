@@ -34,7 +34,7 @@ For extension install/package validation, use `docs/ExtensionPackageContract-1.0
 
 ## Runtime And Capabilities
 
-Open Two Surface Starter and run this in the overlay console (note: the starter's `overlay.html` must load `yoAnimeBridge.js` per [OverlayBootstrapStandard.md](https://github.com/yoanime/yoanime-sdk/blob/main/reference/extension/docs/runtime/OverlayBootstrapStandard.md)):
+Run this capability check once in the taskpane and repeat it in the framed overlay console (the starter's `overlay.html` must load `yoAnimeBridge.js` per [OverlayBootstrapStandard.md](https://github.com/yoanime/yoanime-sdk/blob/main/reference/extension/docs/runtime/OverlayBootstrapStandard.md)). Surface-specific availability is part of the test; taskpane success does not imply overlay success:
 
 ```js
 await yoanime.runtime.ready();
@@ -144,6 +144,19 @@ Expected:
 - No C#, COM, or PowerPoint Object Model knowledge is required.
 
 ## Animation Authoring (0.5.0)
+
+Before running the animation snippet, check the target surface explicitly:
+
+```js
+console.log({
+  surface: yoanime.runtime.surface,
+  create: typeof yoanime.animation?.create,
+  preview: typeof yoanime.animation?.preview,
+  commit: typeof yoanime.animation?.commit
+});
+```
+
+**Pass criterion:** all three animation methods are functions on the tested surface. The public package-template framed-iframe proxy currently does not define an `animation` namespace, so an overlay result showing `undefined` is a surface-compatibility failure that must be recorded, not skipped or inferred from the TypeScript declarations. Do not mark the full v0.5 animation smoke as passed unless taskpane and overlay results are recorded separately.
 
 ```js
 const scene = await yoanime.scene.get({ includeGeometry: true });
