@@ -74,7 +74,7 @@ The full public package contract is `docs/ExtensionPackageContract-1.0.2.md`. Fo
 }
 ```
 
-## 4. Use The Stable SDK Path — animation.* (higher-level)
+## 4. Higher-Level Authoring — animation.* (Preview in Platform v0.5.0)
 
 Preferred authoring for v0.5: `animation.create → preview → commit → timeline.play`.
 
