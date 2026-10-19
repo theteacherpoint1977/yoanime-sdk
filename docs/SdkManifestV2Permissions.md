@@ -14,7 +14,7 @@ audience:
 
 Extensions declare `yoanime-extension.json` or `manifest.json` with `manifestVersion: 2`.
 
-The authoritative package contract for yoAnime `1.0.2.0` is `docs/ExtensionPackageContract-1.0.2.md`.
+This page documents the **1.0.2-era manifest and permission baseline**. The SDK platform has since documented Platform `v0.5.0` with SDK contract `0.4.0`; use `docs/YoAnimeSdkReference-0.5.0.md` and `docs/ReleaseNotes-0.5.0.md` for current API stability classifications. Historical `1.0.2.0` labels and examples below are not a claim that the current Microsoft Store package is version `1.0.2.0`.
 
 ```json
 {
