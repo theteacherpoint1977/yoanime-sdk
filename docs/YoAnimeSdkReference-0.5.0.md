@@ -85,7 +85,7 @@ This document is the public SDK surface for yoAnime **Platform v0.5.0**. The can
 | `expressions` | `_parse`, `_eval` | internal | none | both | Implementation detail for `evaluate`/`generateFromExpression`. |
 | `transforms` | `previewRotation`, `commitRotation`, `onChanged` | preview | `shapes.write` | both | Fire-and-forget rotation preview/commit (void). |
 | `commands` | `rotate`, `translate`, `scale`, `setPivot`, `onChanged` | preview | `shapes.write` | both | Fire-and-forget imperative shape commands (void). |
-| `animation` | `create`, `list`, `get`, `update`, `remove`, `reorder`, `onChanged`, `preview`, `commit`, `save`, `load`, `undo`, `redo` | preview (v0.5) | `animation.read` (list/get/preview/save/load/onChanged) and `timeline.write` (create/update/remove/reorder/commit) | both | Higher-level animation authoring model: `create→preview→commit→timeline`. Host-minted `animationId`, ordered, versioned. `commit` bakes to `timeline` (`timelineVersion++`). |
+| `animation` | `create`, `list`, `get`, `update`, `remove`, `reorder`, `onChanged`, `preview`, `commit`, `save`, `load`, `undo`, `redo` | preview (v0.5) | `animation.read` (list/get/preview/save/load/onChanged) and `timeline.write` (create/update/remove/reorder/commit) | taskpane; framed overlay proxy incomplete | Higher-level animation authoring model: `create→preview→commit→timeline`. Host-minted `animationId`, ordered, versioned. `commit` bakes to `timeline` (`timelineVersion++`). The public package-template `js/yoAnimeBridge.js` iframe proxy currently does not expose an `animation` namespace; overlay support requires a bridge/host path that provides these methods and a passing surface-specific smoke test. |
 
 ### Inventory
 
