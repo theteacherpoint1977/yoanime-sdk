@@ -129,6 +129,8 @@ await yoanime.animation.load({ slot: "my-slot" });
 
 Permissions: `animation.read` (list/get/preview/save/load/onChanged) and `timeline.write` (create/update/remove/reorder/commit). `animation.commit` internally calls `timeline.bake`.
 
+**Surface compatibility:** `animation.*` is a Platform v0.5.0 preview API. The taskpane SDK injection and the framed-overlay iframe proxy are different surfaces. Source review of the public package-template `js/yoAnimeBridge.js` shows that its iframe proxy does not currently define an `animation` namespace. Therefore this example is **not confirmed to work through that proxy in an overlay iframe**; check `typeof yoanime.animation?.create` on the target surface and treat a missing method as a real compatibility gap, not as a TypeScript/documentation-only issue. Do not assume the API works on both surfaces until the host bridge forwards the methods and the surface-specific smoke test passes.
+
 ## 4b. Lower-level alternative — timeline.bake()
 
 Direct timeline authoring remains `@stable` for custom tracks:
