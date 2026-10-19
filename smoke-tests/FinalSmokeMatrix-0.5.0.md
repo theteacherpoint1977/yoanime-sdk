@@ -56,7 +56,7 @@ Run this matrix before packaging and before Microsoft Store submission.
 | Area | Test | Expected |
 | --- | --- | --- |
 | Runtime | `runtime.ready()` | Resolves |
-| Capabilities | `runtime.getCapabilities()` | Record `sdkVersion` and `hostVersion` separately; for a host claiming the v0.5.0 platform contract, verify SDK contract `0.4.0`, permissions, and stability metadata. Fail clearly if the candidate host does not expose the expected contract |
+| Capabilities | `runtime.getCapabilities()` | Record `sdkVersion` and `hostVersion` separately; for a host claiming the v0.5.0 platform release, verify SDK contract `0.4.0`, permissions, and stability metadata. Fail clearly if the candidate host does not expose the expected contract |
 | Selection | Select a shape and call `selection.get()` | Returns selected runtime identity |
 | Scene | `scene.get({ includeGeometry: true, includeTags: true })` | Returns slide-point shape list |
 | Identity diagnostics | Duplicate/delete/copy/paste shapes | No duplicated runtime ids remain after reconciliation |
