@@ -23,7 +23,7 @@ Run this matrix before packaging and before Microsoft Store submission.
 | Area | Test | Expected |
 | --- | --- | --- |
 | WPF build | Build `CustomRotationPointApp/yoAnimeServer.csproj` Release x64 | Build succeeds with 0 errors |
-| Package version | Inspect `Package.appxmanifest` | Identity version is `1.0.2.0` |
+| Package version | Inspect candidate `Package.appxmanifest` | Identity version matches the approved candidate version recorded in the run report; do not infer the Store-delivered version from a local manifest |
 | App launch | Launch packaged app | Welcome Screen opens |
 | WebView2 | Open any built-in extension | Taskpane/overlay WebView2 initializes |
 
@@ -56,7 +56,7 @@ Run this matrix before packaging and before Microsoft Store submission.
 | Area | Test | Expected |
 | --- | --- | --- |
 | Runtime | `runtime.ready()` | Resolves |
-| Capabilities | `runtime.getCapabilities()` | SDK `0.3.0`, trust, permission risk, stability metadata |
+| Capabilities | `runtime.getCapabilities()` | Record `sdkVersion` and `hostVersion` separately; for a host claiming the v0.5.0 platform contract, verify SDK contract `0.4.0`, permissions, and stability metadata. Fail clearly if the candidate host does not expose the expected contract |
 | Selection | Select a shape and call `selection.get()` | Returns selected runtime identity |
 | Scene | `scene.get({ includeGeometry: true, includeTags: true })` | Returns slide-point shape list |
 | Identity diagnostics | Duplicate/delete/copy/paste shapes | No duplicated runtime ids remain after reconciliation |
