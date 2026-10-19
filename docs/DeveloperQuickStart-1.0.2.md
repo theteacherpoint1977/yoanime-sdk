@@ -42,7 +42,7 @@ For public third-party work, model your extension after Hello World SDK or Two S
 
 ## 3. Build The Manifest
 
-Use `manifestVersion: 2` and `sdkVersionMin: "0.3.0"`.
+For the general 1.0.2-era package template, `sdkVersionMin: "0.3.0"` remains the documented baseline. **This guide's `animation.*` example is for Platform v0.5.0 / SDK contract v0.4.0, so its manifest must require `sdkVersionMin: "0.4.0"` or later.**
 
 The full public package contract is `docs/ExtensionPackageContract-1.0.2.md`. For a copyable package shape, start from `docs/SdkSamples/1.0.2/extension-package-template`.
 
@@ -55,7 +55,7 @@ The full public package contract is `docs/ExtensionPackageContract-1.0.2.md`. Fo
   "surface": "overlay-taskpane",
   "entry": "overlay.html",
   "taskPaneEntry": "taskpane.html",
-  "sdkVersionMin": "0.3.0",
+  "sdkVersionMin": "0.4.0",
   "permissions": [
     "selection.read",
     "scene.read",
